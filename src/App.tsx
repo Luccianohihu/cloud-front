@@ -1,10 +1,15 @@
-import React from "react";
-import { CustomButton } from "./shared/ui/atomos/custom-button/CustomButton";
+import { Route, Routes } from "react-router-dom";
+import "./App.css";
+import { LoginPage } from "./features/login/LoginPage";
+import Test from "./features/test/Test";
 
-export default function App() {
+function App() {
   return (
-    <div>
-      <CustomButton size="sm">Click me</CustomButton>
-    </div>
+    <Routes>
+      <Route path="/" element={<LoginPage />} />
+      <Route path="/test" element={<Test />} />
+    </Routes>
   );
 }
+
+export default App;
