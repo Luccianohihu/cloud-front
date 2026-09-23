@@ -1,0 +1,23 @@
+export const UI = {
+  COLOR: {
+    PRIMARY: "#0078D4",
+    SECONDARY: "#2B579A",
+    SUCCESS: "#10B981",
+    DANGER: "#EF4444",
+    WARNING: "#F59E0B",
+
+    BACKGROUND: {
+      MAIN: "#F3F4F6",
+      SURFACE: "#FFFFFF",
+      NAVBAR: "#1E293B",
+      MUTED: "#E5E7EB",
+    },
+
+    FONT: {
+      PRIMARY: "#1F2937",
+      SECONDARY: "#6B7280",
+      MUTED: "#9CA3AF",
+      INVERSE: "#FFFFFF",
+    },
+  },
+} as const;
