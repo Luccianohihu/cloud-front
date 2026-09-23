@@ -1,0 +1,219 @@
+/* src/components/OrdersDashboard.module.css */
+
+.dashboardContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background-color: var(--bg-main, #f3f4f6);
+  min-height: 100vh;
+  box-sizing: border-box;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--font-primary, #1f2937);
+  margin: 0;
+}
+
+.subtitle {
+  color: var(--font-secondary, #6b7280);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* KPIs */
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.metricCard {
+  background-color: #ffffff;
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+}
+
+.metricTitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.metricValue {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #1f2937;
+  margin: 0.25rem 0;
+}
+
+.metricSubtitle {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+/* Tarjeta y Filtros */
+.sectionCard {
+  background-color: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 1.25rem;
+}
+
+.filterBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.searchInput {
+  padding: 0.5rem 0.85rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  width: 260px;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.tabButton {
+  background: none;
+  border: none;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.tabActive {
+  composes: tabButton;
+  background-color: #f3f4f6;
+  color: #0078d4;
+  font-weight: 600;
+}
+
+/* Tabla */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.table td {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  color: #1f2937;
+}
+
+.boldText {
+  font-weight: 600;
+}
+
+/* Badges de estado */
+.badgeWarning {
+  background-color: #fef3c7;
+  color: #d97706;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badgeInfo {
+  background-color: #e0f2fe;
+  color: #0284c7;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badgeSuccess {
+  background-color: #d1fae5;
+  color: #059669;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badgeDanger {
+  background-color: #fee2e2;
+  color: #dc2626;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Acciones por rol */
+.actionColumn {
+  text-align: right;
+}
+
+.btnLink {
+  background: none;
+  border: none;
+  color: #0078d4;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.statusSelect {
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.8rem;
+  background-color: #ffffff;
+  cursor: pointer;
+}
+
+.btnDanger {
+  background-color: #ef4444;
+  color: #ffffff;
+  border: none;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnDanger:hover {
+  background-color: #dc2626;
+}
+
+.loadingText {
+  text-align: center;
+  padding: 2rem;
+  color: #6b7280;
+}
