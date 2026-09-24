@@ -1,9 +1,12 @@
+// src/features/login/LoginPage.tsx
 import React from "react";
-
 import { CustomButton } from "../../shared/ui/atomos/custom-button/CustomButton";
+import { useAuth } from "../../context/AuthContext";
 import styles from "./LoginPage.module.css";
 
 export const LoginPage: React.FC = () => {
+  const { login } = useAuth(); // Hook de autenticación
+
   return (
     <div className={styles.loginPage}>
       <section className={styles.brandHero}>
@@ -24,9 +27,7 @@ export const LoginPage: React.FC = () => {
             variant="primary"
             size="lg"
             fullWidth
-            onClick={() => {
-              console.log("Iniciar sesión con AWS");
-            }}
+            onClick={login} // Llama al redireccionamiento de Cognito
           >
             Acceder
           </CustomButton>

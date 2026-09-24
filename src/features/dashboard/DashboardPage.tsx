@@ -1,230 +1,329 @@
-import React, { useState } from "react";
-import type { UserRole } from "./DashboardPage.types";
+// src/features/dashboard/DashboardPage.tsx
+
+import React, { useState, useEffect } from "react";
+import {
+  dashboardService,
+  type ClienteMetrics,
+  type OperadorMetrics,
+  type AdminMetrics,
+} from "./DashboardService";
+import { useAuth } from "../../context/AuthContext";
 import styles from "./DashboardPage.module.css";
 
-export const DashboardPage: React.FC = () => {
-  // Simulación del rol del usuario autenticado (CLIENTE, OPERADOR, ADMIN)
-  const [currentUserRole, setCurrentUserRole] = useState<UserRole>("OPERADOR");
+interface DashboardPageProps {
+  userId?: string;
+  accessToken?: string;
+}
+
+export const DashboardPage: React.FC<DashboardPageProps> = ({
+  userId: propUserId,
+  accessToken: propToken,
+}) => {
+  const { token: contextToken, role: contextRole, user } = useAuth();
+
+  const token = propToken || contextToken || undefined;
+  const userId = user?.username || user?.id || propUserId || "CLI-001";
+  const userRole = contextRole || "ROLE_CLIENTE";
+
+  // Identificación dinámica con priorización de roles
+  const roleUpper = userRole.toUpperCase();
+  const isAdmin = roleUpper.includes("ADMIN");
+  const isOperador = roleUpper.includes("OPERADOR") && !isAdmin;
+  const isCliente = roleUpper.includes("CLIENTE") && !isAdmin && !isOperador;
+
+  const [clienteData, setClienteData] = useState<ClienteMetrics | null>(null);
+  const [operadorData, setOperadorData] = useState<OperadorMetrics | null>(
+    null,
+  );
+  const [adminData, setAdminData] = useState<AdminMetrics | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      setLoading(true);
+      try {
+        if (isAdmin) {
+          const data = await dashboardService.getAdminMetrics(token);
+          setAdminData(data);
+        } else if (isOperador) {
+          const data = await dashboardService.getOperadorMetrics(token);
+          setOperadorData(data);
+        } else if (isCliente) {
+          const data = await dashboardService.getClienteMetrics(userId, token);
+          setClienteData(data);
+        }
+      } catch (error) {
+        console.error("Error al cargar datos del dashboard:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      loadDashboardData();
+    }
+  }, [userRole, userId, token, isCliente, isOperador, isAdmin]);
 
   return (
     <div className={styles.dashboardContainer}>
-      {/* Selector interactivo solo para simulación/pruebas en desarrollo */}
-      <div
-        style={{
-          padding: "0.5rem 1rem",
-          background: "#e2e8f0",
-          borderRadius: "8px",
-          fontSize: "0.8rem",
-          marginBottom: "1.5rem",
-        }}
-      >
-        <strong>Simular Rol Autenticado: </strong>
-        <button onClick={() => setCurrentUserRole("CLIENTE")}>Cliente</button>
-        {" | "}
-        <button onClick={() => setCurrentUserRole("OPERADOR")}>Operador</button>
-        {" | "}
-        <button onClick={() => setCurrentUserRole("ADMIN")}>Admin</button>
-      </div>
-
-      {/* Renderizado condicional del Dashboard correspondiente */}
-      {currentUserRole === "CLIENTE" && <ClienteDashboard />}
-      {currentUserRole === "OPERADOR" && <OperadorDashboard />}
-      {currentUserRole === "ADMIN" && <AdminDashboard />}
+      {loading ? (
+        <p className={styles.loadingText}>Cargando métricas en vivo...</p>
+      ) : (
+        <>
+          {isAdmin && adminData && <AdminDashboard data={adminData} />}
+          {isOperador && operadorData && (
+            <OperadorDashboard data={operadorData} />
+          )}
+          {isCliente && clienteData && <ClienteDashboard data={clienteData} />}
+          {!clienteData && !operadorData && !adminData && (
+            <p>No se encontraron datos disponibles para tu usuario.</p>
+          )}
+        </>
+      )}
     </div>
   );
 };
 
 /* ==========================================
-   --- VISTA CLIENTE (Informativa) ---
+   --- VISTA CLIENTE ---
 ========================================== */
-const ClienteDashboard: React.FC = () => (
+const ClienteDashboard: React.FC<{ data: ClienteMetrics }> = ({ data }) => (
   <>
     <header className={styles.header}>
       <div>
         <h1 className={styles.title}>Panel de Cliente</h1>
-        <p className={styles.subtitle}>
-          Resumen de tus compras activas y estado de tus entregas.
-        </p>
+        <p className={styles.subtitle}>Resumen de tus compras y entregas.</p>
       </div>
     </header>
 
     <div className={styles.metricsGrid}>
       <div className={styles.metricCard}>
         <span className={styles.metricTitle}>Mis Pedidos Totales</span>
-        <span className={styles.metricValue}>12</span>
-        <span className={styles.metricSubtitle}>Histórico registrado</span>
+        <span className={styles.metricValue}>{data.totalOrders}</span>
       </div>
       <div className={styles.metricCard}>
-        <span className={styles.metricTitle}>En Camino</span>
-        <span className={styles.metricValue}>3</span>
-        <span className={styles.metricSubtitle}>En preparación/despacho</span>
+        <span className={styles.metricTitle}>En Proceso</span>
+        <span className={styles.metricValue}>{data.inProgressOrders}</span>
       </div>
       <div className={styles.metricCard}>
         <span className={styles.metricTitle}>Entregados</span>
-        <span className={styles.metricValue}>9</span>
-        <span className={styles.metricSubtitle}>Completados con éxito</span>
+        <span className={styles.metricValue}>{data.deliveredOrders}</span>
       </div>
       <div className={styles.metricCard}>
         <span className={styles.metricTitle}>Gasto Acumulado</span>
-        <span className={styles.metricValue}>€850.00</span>
-        <span className={styles.metricSubtitle}>Total en compras</span>
+        <span className={styles.metricValue}>
+          €{data.totalSpent.toLocaleString()}
+        </span>
       </div>
     </div>
 
-    <section className={styles.sectionCard}>
-      <h3>Último Pedido Registrado</h3>
-      <div
-        style={{ marginTop: "0.5rem", fontSize: "0.9rem", color: "#334155" }}
-      >
+    {data.latestOrder && (
+      <section className={styles.sectionCard}>
+        <h3>Último Pedido Registrado</h3>
         <p>
-          <strong>ID:</strong> #PED-2094
+          <strong>ID:</strong> #{data.latestOrder.id.substring(0, 8)}...
         </p>
         <p>
-          <strong>Fecha:</strong> 24 Oct 2024
+          <strong>Fecha:</strong> {data.latestOrder.createdAt}
         </p>
         <p>
-          <strong>Estado Actual:</strong>{" "}
-          <mark
-            style={{
-              background: "#fef3c7",
-              color: "#d97706",
-              padding: "2px 8px",
-              borderRadius: "4px",
-              fontWeight: 600,
-            }}
-          >
-            EN PREPARACIÓN
-          </mark>
+          <strong>Estado:</strong> {data.latestOrder.status}
         </p>
-      </div>
-    </section>
+      </section>
+    )}
   </>
 );
 
 /* ==========================================
-   --- VISTA OPERADOR (Informativa) ---
+   --- VISTA OPERADOR ---
 ========================================== */
-const OperadorDashboard: React.FC = () => (
+const OperadorDashboard: React.FC<{ data: OperadorMetrics }> = ({ data }) => (
   <>
     <header className={styles.header}>
       <div>
         <h1 className={styles.title}>Panel Operativo</h1>
-        <p className={styles.subtitle}>
-          Estado general del flujo de pedidos y monitoreo de almacén.
-        </p>
+        <p className={styles.subtitle}>Estado del flujo de pedidos y stock.</p>
       </div>
     </header>
 
     <div className={styles.metricsGrid}>
       <div className={styles.metricCard}>
-        <span className={styles.metricTitle}>Pendientes</span>
-        <span className={styles.metricValue}>5</span>
-        <span className={styles.metricSubtitle}>Por validar stock</span>
+        <span className={styles.metricTitle}>Pendientes (Creados)</span>
+        <span className={styles.metricValue}>{data.pendingCount}</span>
       </div>
       <div className={styles.metricCard}>
         <span className={styles.metricTitle}>En Preparación</span>
-        <span className={styles.metricValue}>7</span>
-        <span className={styles.metricSubtitle}>En empaque y empaque</span>
+        <span className={styles.metricValue}>{data.inPreparationCount}</span>
       </div>
       <div className={styles.metricCard}>
-        <span className={styles.metricTitle}>Por Despachar</span>
-        <span className={styles.metricValue}>14</span>
-        <span className={styles.metricSubtitle}>Listos en almacén</span>
+        <span className={styles.metricTitle}>Listos (Aceptados)</span>
+        <span className={styles.metricValue}>{data.readyToShipCount}</span>
       </div>
       <div className={styles.metricCard}>
-        <span className={styles.metricTitle}>Alertas de Stock</span>
-        <span className={styles.metricValue}>2</span>
-        <span className={styles.metricSubtitle}>Bajo el límite mínimo</span>
+        <span className={styles.metricTitle}>Alertas de Stock (&lt;5)</span>
+        <span className={styles.metricValue}>{data.stockAlertsCount}</span>
       </div>
     </div>
 
-    <section className={styles.sectionCard}>
-      <h3>Monitoreo de Pedidos Recientes</h3>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>ID Pedido</th>
-            <th>Cliente</th>
-            <th>Fecha</th>
-            <th>Estado Actual</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>#PED-3012</td>
-            <td>Juan Pérez</td>
-            <td>Hoy, 10:30 AM</td>
-            <td>
-              <span className={styles.badgeWarning}>CREADO</span>
-            </td>
-          </tr>
-          <tr>
-            <td>#PED-3010</td>
-            <td>María López</td>
-            <td>Hoy, 09:15 AM</td>
-            <td>
-              <span className={styles.badgeInfo}>EN PREPARACIÓN</span>
-            </td>
-          </tr>
-          <tr>
-            <td>#PED-3008</td>
-            <td>Carlos Ruiz</td>
-            <td>Ayer</td>
-            <td>
-              <span className={styles.badgeSuccess}>DESPACHADO</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+    <div className={styles.sectionsContainer}>
+      <section className={styles.sectionCard}>
+        <h3>Monitoreo de Pedidos Recientes</h3>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>ID Pedido</th>
+              <th>Cliente</th>
+              <th>Fecha</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.recentOrders.length > 0 ? (
+              data.recentOrders.map((order) => (
+                <tr key={order.id}>
+                  <td>#{order.id.substring(0, 8)}...</td>
+                  <td>{order.customerId}</td>
+                  <td>{order.createdAt}</td>
+                  <td>
+                    <span className={styles.badge}>{order.status}</span>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4}>No hay pedidos recientes.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+
+      <section className={styles.sectionCard}>
+        <h3>Productos con Bajo Stock (&lt; 5 unidades)</h3>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Precio</th>
+              <th>Stock Restante</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.lowStockProducts.length > 0 ? (
+              data.lowStockProducts.map((product) => (
+                <tr key={product.id}>
+                  <td>{product.name}</td>
+                  <td>€{product.price.toFixed(2)}</td>
+                  <td style={{ color: "orange", fontWeight: "bold" }}>
+                    {product.stock}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={3}>No hay alertas de stock bajo.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+    </div>
   </>
 );
 
 /* ==========================================
-   --- VISTA ADMINISTRADOR (Informativa) ---
+   --- VISTA ADMINISTRADOR ---
 ========================================== */
-const AdminDashboard: React.FC = () => (
+const AdminDashboard: React.FC<{ data: AdminMetrics }> = ({ data }) => (
   <>
     <header className={styles.header}>
       <div>
         <h1 className={styles.title}>Panel de Administración Global</h1>
-        <p className={styles.subtitle}>
-          Métricas consolidadas del negocio, catálogo e inventario general.
-        </p>
+        <p className={styles.subtitle}>Métricas consolidadas del negocio.</p>
       </div>
     </header>
 
     <div className={styles.metricsGrid}>
       <div className={styles.metricCard}>
         <span className={styles.metricTitle}>Ventas Totales</span>
-        <span className={styles.metricValue}>€14,250</span>
-        <span className={styles.metricSubtitle}>
-          +12% respecto al mes anterior
+        <span className={styles.metricValue}>
+          €{data.totalSales.toLocaleString()}
         </span>
       </div>
       <div className={styles.metricCard}>
         <span className={styles.metricTitle}>Total Pedidos</span>
-        <span className={styles.metricValue}>342</span>
-        <span className={styles.metricSubtitle}>Plataforma global</span>
+        <span className={styles.metricValue}>{data.totalOrders}</span>
       </div>
       <div className={styles.metricCard}>
         <span className={styles.metricTitle}>Productos Activos</span>
-        <span className={styles.metricValue}>48</span>
-        <span className={styles.metricSubtitle}>Catálogo disponible</span>
+        <span className={styles.metricValue}>{data.activeProductsCount}</span>
       </div>
       <div className={styles.metricCard}>
         <span className={styles.metricTitle}>Sin Stock</span>
-        <span className={styles.metricValue}>3</span>
-        <span className={styles.metricSubtitle}>Requieren reposición</span>
+        <span className={styles.metricValue}>{data.outOfStockCount}</span>
       </div>
     </div>
 
-    <section className={styles.sectionCard}>
-      <h3>Resumen Operativo del Sistema</h3>
-      <p style={{ fontSize: "0.875rem", color: "#64748b" }}>
-        Visualización del estado consolidado entre los microservicios
-        <code>ms-pedidos360-orders</code> y <code>ms-pedidos360-catalog</code>.
-      </p>
-    </section>
+    <div className={styles.sectionsContainer}>
+      <section className={styles.sectionCard}>
+        <h3>Últimas Transacciones Registradas</h3>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>ID Pedido</th>
+              <th>Cliente</th>
+              <th>Monto Total</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.recentOrders.length > 0 ? (
+              data.recentOrders.map((order) => (
+                <tr key={order.id}>
+                  <td>#{order.id.substring(0, 8)}...</td>
+                  <td>{order.customerId}</td>
+                  <td>€{order.total.toFixed(2)}</td>
+                  <td>
+                    <span className={styles.badge}>{order.status}</span>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4}>No hay ventas registradas.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+
+      <section className={styles.sectionCard}>
+        <h3>Productos Agotados (Stock 0)</h3>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre Producto</th>
+              <th>Precio</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.outOfStockProducts.length > 0 ? (
+              data.outOfStockProducts.map((product) => (
+                <tr key={product.id}>
+                  <td>#{product.id.substring(0, 8)}...</td>
+                  <td>{product.name}</td>
+                  <td>€{product.price.toFixed(2)}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={3}>Todos los productos cuentan con stock.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+    </div>
   </>
 );
