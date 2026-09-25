@@ -1,5 +1,3 @@
-// src/features/dashboard/DashboardService.ts
-
 export interface Product {
   id: string;
   name: string;
@@ -10,17 +8,12 @@ export interface Product {
 export interface Order {
   id: string;
   createdAt: string;
-  status:
-    | "CREADO"
-    | "ACEPTADO"
-    | "EN_PREPARACIÓN"
-    | "DESPACHADO"
-    | "ENTREGADO"
-    | "CANCELADO";
+  status: string;
   total: number;
   customerId: string;
 }
 
+// Métricas exclusivas del cliente
 export interface ClienteMetrics {
   totalOrders: number;
   inProgressOrders: number;
@@ -29,22 +22,13 @@ export interface ClienteMetrics {
   latestOrder: Order | null;
 }
 
-export interface OperadorMetrics {
-  pendingCount: number;
-  inPreparationCount: number;
-  readyToShipCount: number;
-  stockAlertsCount: number;
+// Resumen general compartido entre Operador y Admin
+export interface GeneralSummary {
+  totalOrders: number;
+  pendingOrders: number;
+  deliveredOrders: number;
   recentOrders: Order[];
   lowStockProducts: Product[];
-}
-
-export interface AdminMetrics {
-  totalSales: number;
-  totalOrders: number;
-  activeProductsCount: number;
-  outOfStockCount: number;
-  recentOrders: Order[];
-  outOfStockProducts: Product[];
 }
 
 const ORDERS_URL = "http://localhost:8080/api/v1/orders";
@@ -61,6 +45,9 @@ const extractData = async <T>(response: Response): Promise<T> => {
     throw new Error(`Error HTTP (${response.status}): ${errorText}`);
   }
   const json = await response.json();
+  if (Array.isArray(json)) return json as unknown as T;
+  if (Array.isArray(json.content)) return json.content as unknown as T;
+  if (Array.isArray(json.data)) return json.data as unknown as T;
   return (json.data !== undefined ? json.data : json) as T;
 };
 
@@ -73,36 +60,48 @@ const mapToOrder = (raw: any): Order => ({
         day: "numeric",
       })
     : new Date().toLocaleDateString("es-ES"),
-  status: (raw.orderState || raw.status || "CREADO") as Order["status"],
+  status: String(raw.orderState || raw.status || "CREADO"),
   total: Number(raw.total || 0),
-  customerId: String(raw.clientId || raw.customerId || "CLI-001"),
+  customerId: String(raw.clientId || raw.customerId || "N/A"),
 });
 
 const mapToProduct = (raw: any): Product => ({
   id: String(raw.id),
-  name: raw.name || "",
+  name: raw.name || "Producto sin nombre",
   price: Number(raw.price || 0),
   stock: Number(raw.stock || 0),
 });
 
 export const dashboardService = {
-  // 1. Métricas para el Cliente
+  // 1. Obtiene las métricas individuales del Cliente
   getClienteMetrics: async (
-    customerId: string,
+    customerId?: string,
     token?: string,
   ): Promise<ClienteMetrics> => {
-    const res = await fetch(`${ORDERS_URL}?customerId=${customerId}`, {
+    const query =
+      customerId && customerId !== "CLI-UNKNOWN"
+        ? `?customerId=${customerId}`
+        : "";
+
+    const res = await fetch(`${ORDERS_URL}${query}`, {
       headers: getHeaders(token),
     });
 
     const rawOrders = await extractData<any[]>(res);
-    const orders = rawOrders.map(mapToOrder);
+    const list = Array.isArray(rawOrders) ? rawOrders : [];
+    const orders = list.map(mapToOrder);
 
     const deliveredOrders = orders.filter(
       (o) => o.status === "ENTREGADO",
     ).length;
     const inProgressOrders = orders.filter((o) =>
-      ["CREADO", "ACEPTADO", "EN_PREPARACIÓN", "DESPACHADO"].includes(o.status),
+      [
+        "CREADO",
+        "ACEPTADO",
+        "EN_PREPARACIÓN",
+        "EN_PREPARACION",
+        "DESPACHADO",
+      ].includes(o.status),
     ).length;
     const totalSpent = orders.reduce((sum, o) => sum + o.total, 0);
     const latestOrder = orders.length > 0 ? orders[0] : null;
@@ -116,52 +115,41 @@ export const dashboardService = {
     };
   },
 
-  // 2. Métricas para el Operador
-  getOperadorMetrics: async (token?: string): Promise<OperadorMetrics> => {
+  // 2. Resumen general para Admin y Operador
+  getGeneralSummary: async (token?: string): Promise<GeneralSummary> => {
     const [ordersRes, productsRes] = await Promise.all([
-      fetch(ORDERS_URL, { headers: getHeaders(token) }),
-      fetch(PRODUCTS_URL, { headers: getHeaders(token) }),
+      fetch(`${ORDERS_URL}/all`, { headers: getHeaders(token) }).catch(
+        () => null,
+      ),
+      fetch(PRODUCTS_URL, { headers: getHeaders(token) }).catch(() => null),
     ]);
 
-    const rawOrders = await extractData<any[]>(ordersRes);
-    const rawProducts = await extractData<any[]>(productsRes);
+    let orders: Order[] = [];
+    if (ordersRes && ordersRes.ok) {
+      const rawOrders = await extractData<any[]>(ordersRes);
+      const list = Array.isArray(rawOrders) ? rawOrders : [];
+      orders = list.map(mapToOrder);
+    }
 
-    const orders = rawOrders.map(mapToOrder);
-    const products = rawProducts.map(mapToProduct);
+    let products: Product[] = [];
+    if (productsRes && productsRes.ok) {
+      const rawProducts = await extractData<any[]>(productsRes);
+      const list = Array.isArray(rawProducts) ? rawProducts : [];
+      products = list.map(mapToProduct);
+    }
+
     const lowStockProducts = products.filter((p) => p.stock < 5);
 
     return {
-      pendingCount: orders.filter((o) => o.status === "CREADO").length,
-      inPreparationCount: orders.filter((o) => o.status === "EN_PREPARACIÓN")
-        .length,
-      readyToShipCount: orders.filter((o) => o.status === "ACEPTADO").length,
-      stockAlertsCount: lowStockProducts.length,
+      totalOrders: orders.length,
+      pendingOrders: orders.filter((o) =>
+        ["CREADO", "ACEPTADO", "EN_PREPARACIÓN", "EN_PREPARACION"].includes(
+          o.status,
+        ),
+      ).length,
+      deliveredOrders: orders.filter((o) => o.status === "ENTREGADO").length,
       recentOrders: orders.slice(0, 5),
       lowStockProducts: lowStockProducts.slice(0, 5),
-    };
-  },
-
-  // 3. Métricas para el Administrador
-  getAdminMetrics: async (token?: string): Promise<AdminMetrics> => {
-    const [ordersRes, productsRes] = await Promise.all([
-      fetch(ORDERS_URL, { headers: getHeaders(token) }),
-      fetch(PRODUCTS_URL, { headers: getHeaders(token) }),
-    ]);
-
-    const rawOrders = await extractData<any[]>(ordersRes);
-    const rawProducts = await extractData<any[]>(productsRes);
-
-    const orders = rawOrders.map(mapToOrder);
-    const products = rawProducts.map(mapToProduct);
-    const outOfStockProducts = products.filter((p) => p.stock === 0);
-
-    return {
-      totalSales: orders.reduce((sum, o) => sum + o.total, 0),
-      totalOrders: orders.length,
-      activeProductsCount: products.length,
-      outOfStockCount: outOfStockProducts.length,
-      recentOrders: orders.slice(0, 5),
-      outOfStockProducts: outOfStockProducts.slice(0, 5),
     };
   },
 };
