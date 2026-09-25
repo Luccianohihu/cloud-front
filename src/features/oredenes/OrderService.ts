@@ -47,7 +47,6 @@ const extractData = async <T>(response: Response): Promise<T> => {
   }
   const json = await response.json();
 
-  // Detecta si es una lista directa, un Spring Page ({ content: [] }) o un wrapper ({ data: [] })
   if (Array.isArray(json)) return json as unknown as T;
   if (Array.isArray(json.content)) return json.content as unknown as T;
   if (Array.isArray(json.data)) return json.data as unknown as T;
@@ -90,10 +89,16 @@ export const orderService = {
   },
 
   getOrdersByCustomer: async (
-    customerId: string,
+    customerId?: string,
     token?: string,
   ): Promise<Order[]> => {
-    const response = await fetch(`${BASE_URL}?customerId=${customerId}`, {
+    // Si customerId está vacío o es CLI-UNKNOWN, no envía ?customerId= para que el BFF use el JWT
+    const query =
+      customerId && customerId !== "CLI-UNKNOWN"
+        ? `?customerId=${customerId}`
+        : "";
+
+    const response = await fetch(`${BASE_URL}${query}`, {
       headers: getHeaders(token),
     });
     const rawList = await extractData<any>(response);

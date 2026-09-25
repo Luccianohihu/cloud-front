@@ -52,8 +52,9 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   const isAdmin = roleString.includes("ADMINISTRADOR");
   const isCliente = roleString.includes("CLIENTE") && !isOperador && !isAdmin;
 
+  // Prioriza username sobre ID para garantizar coincidencia con la base de datos
   const userId =
-    propUserId || contextUser?.id || contextUser?.username || "CLI-UNKNOWN";
+    propUserId || contextUser?.username || contextUser?.id || "CLI-UNKNOWN";
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -63,6 +64,9 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   const [newOrderTotal, setNewOrderTotal] = useState<number>(15000);
 
   useEffect(() => {
+    // Si aún no hay token cargado, detener ejecución
+    if (!token) return;
+
     fetchOrders();
   }, [roleString, userId, token]);
 
