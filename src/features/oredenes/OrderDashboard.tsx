@@ -213,13 +213,6 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
               : "Gestión de flujos de estado, despacho y administración general."}
           </p>
         </div>
-
-        <button
-          className={styles.btnPrimary}
-          onClick={() => setShowCreateModal(true)}
-        >
-          + Crear Nuevo Pedido
-        </button>
       </div>
 
       <div className={styles.metricsGrid}>
