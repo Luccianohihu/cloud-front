@@ -46,6 +46,12 @@ const extractData = async <T>(response: Response): Promise<T> => {
     );
   }
   const json = await response.json();
+
+  // Detecta si es una lista directa, un Spring Page ({ content: [] }) o un wrapper ({ data: [] })
+  if (Array.isArray(json)) return json as unknown as T;
+  if (Array.isArray(json.content)) return json.content as unknown as T;
+  if (Array.isArray(json.data)) return json.data as unknown as T;
+
   return (json.data !== undefined ? json.data : json) as T;
 };
 
@@ -75,9 +81,12 @@ const mapToFrontendOrder = (rawOrder: any): Order => {
 
 export const orderService = {
   getAllOrders: async (token?: string): Promise<Order[]> => {
-    const response = await fetch(BASE_URL, { headers: getHeaders(token) });
-    const rawList = await extractData<any[]>(response);
-    return rawList.map(mapToFrontendOrder);
+    const response = await fetch(`${BASE_URL}/all`, {
+      headers: getHeaders(token),
+    });
+    const rawList = await extractData<any>(response);
+    const list = Array.isArray(rawList) ? rawList : [];
+    return list.map(mapToFrontendOrder);
   },
 
   getOrdersByCustomer: async (
@@ -87,8 +96,9 @@ export const orderService = {
     const response = await fetch(`${BASE_URL}?customerId=${customerId}`, {
       headers: getHeaders(token),
     });
-    const rawList = await extractData<any[]>(response);
-    return rawList.map(mapToFrontendOrder);
+    const rawList = await extractData<any>(response);
+    const list = Array.isArray(rawList) ? rawList : [];
+    return list.map(mapToFrontendOrder);
   },
 
   getOrderById: async (orderId: string, token?: string): Promise<Order> => {

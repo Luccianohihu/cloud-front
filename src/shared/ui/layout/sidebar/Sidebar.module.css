@@ -104,3 +104,37 @@
   color: #94a3b8;
   margin: 0;
 }
+/* src/shared/ui/layout/Sidebar.module.css */
+
+.footerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 1rem;
+}
+
+.userDetails {
+  overflow: hidden;
+}
+
+.logoutButton {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #fee2e2;
+  background-color: #fef2f2;
+  color: #ef4444;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.logoutButton:hover {
+  background-color: #fee2e2;
+  color: #dc2626;
+}

@@ -1,12 +1,12 @@
 // src/shared/ui/layout/Sidebar.tsx
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShoppingBag, Boxes } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Boxes, LogOut } from "lucide-react";
 import { useAuth } from "../../../../context/AuthContext";
 import styles from "./Sidebar.module.css";
 
 export const Sidebar: React.FC = () => {
-  const { user, role } = useAuth();
+  const { user, role, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -15,6 +15,11 @@ export const Sidebar: React.FC = () => {
     { label: "Pedidos", path: "/orders", icon: ShoppingBag },
     { label: "Catálogo", path: "/catalogo", icon: Boxes },
   ];
+
+  const handleLogout = () => {
+    logout();
+    navigate("/", { replace: true });
+  };
 
   return (
     <aside className={styles.sidebar}>
@@ -46,18 +51,29 @@ export const Sidebar: React.FC = () => {
         </nav>
       </div>
 
-      <div className={styles.userProfile}>
-        <img
-          src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&q=80"
-          alt="Usuario"
-          className={styles.avatar}
-        />
-        <div>
-          <p className={styles.userName}>
-            {user?.username || "Usuario Activo"}
-          </p>
-          <p className={styles.userRole}>{role || "CLIENTE"}</p>
+      <div className={styles.footerSection}>
+        <div className={styles.userProfile}>
+          <img
+            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&q=80"
+            alt="Usuario"
+            className={styles.avatar}
+          />
+          <div className={styles.userDetails}>
+            <p className={styles.userName}>
+              {user?.username || "Usuario Activo"}
+            </p>
+            <p className={styles.userRole}>{role || "CLIENTE"}</p>
+          </div>
         </div>
+
+        <button
+          className={styles.logoutButton}
+          onClick={handleLogout}
+          title="Cerrar sesión"
+        >
+          <LogOut size={18} />
+          Cerrar Sesión
+        </button>
       </div>
     </aside>
   );

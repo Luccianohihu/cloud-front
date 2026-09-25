@@ -53,7 +53,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   const isCliente = roleString.includes("CLIENTE") && !isOperador && !isAdmin;
 
   const userId =
-    propUserId || contextUser?.username || contextUser?.id || "CLI-UNKNOWN";
+    propUserId || contextUser?.id || contextUser?.username || "CLI-UNKNOWN";
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
