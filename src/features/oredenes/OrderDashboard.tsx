@@ -35,7 +35,6 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
 
   const token = propToken || contextToken || undefined;
 
-  // 1. Detección profunda de roles (soporta objetos de Spring Security)
   const rawRole =
     propRole ||
     contextRole ||
@@ -67,7 +66,6 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
     fetchOrders();
   }, [roleString, userId, token]);
 
-  // 2. Carga con prioridad a perfiles operativos
   const fetchOrders = async () => {
     setLoading(true);
     try {
@@ -88,21 +86,14 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   const metrics = useMemo(() => {
     return {
       total: orders.length,
-      creados: orders.filter(
+      creados: orders.filter((o) => o.status === "CREADO").length,
+      enProceso: orders.filter(
         (o) =>
-          o.status === "CREADO" ||
           o.status === "ACEPTADO" ||
-          o.status === "PENDIENTE",
+          o.status === "EN_PREPARACION" ||
+          o.status === "DESPACHADO",
       ).length,
-      despachados: orders.filter(
-        (o) =>
-          o.status === "DESPACHADO" ||
-          o.status === "EN_PREPARACIÓN" ||
-          o.status === "EN_PROCESO",
-      ).length,
-      entregados: orders.filter(
-        (o) => o.status === "ENTREGADO" || o.status === "COMPLETADO",
-      ).length,
+      entregados: orders.filter((o) => o.status === "ENTREGADO").length,
       cancelados: orders.filter((o) => o.status === "CANCELADO").length,
     };
   }, [orders]);
@@ -116,16 +107,12 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
 
       const matchesTab =
         activeTab === "TODOS" ||
-        (activeTab === "CREADOS" &&
-          (order.status === "CREADO" ||
-            order.status === "ACEPTADO" ||
-            order.status === "PENDIENTE")) ||
+        (activeTab === "CREADOS" && order.status === "CREADO") ||
         (activeTab === "EN_PROCESO" &&
-          (order.status === "EN_PREPARACIÓN" ||
-            order.status === "DESPACHADO" ||
-            order.status === "EN_PROCESO")) ||
-        (activeTab === "ENTREGADOS" &&
-          (order.status === "ENTREGADO" || order.status === "COMPLETADO")) ||
+          (order.status === "ACEPTADO" ||
+            order.status === "EN_PREPARACION" ||
+            order.status === "DESPACHADO")) ||
+        (activeTab === "ENTREGADOS" && order.status === "ENTREGADO") ||
         (activeTab === "CANCELADOS" && order.status === "CANCELADO");
 
       return matchesSearch && matchesTab;
@@ -137,12 +124,9 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
     currentStatus: OrderStatus,
     newStatus: OrderStatus,
   ) => {
-    if (
-      newStatus === "DESPACHADO" &&
-      (currentStatus === "CREADO" || currentStatus === "PENDIENTE")
-    ) {
+    if (newStatus === "DESPACHADO" && currentStatus === "CREADO") {
       alert(
-        "Regla de Negocio: Un pedido debe estar en estado ACEPTADO o EN PREPARACIÓN antes de ser DESPACHADO.",
+        "Regla de Negocio: Un pedido debe estar en estado ACEPTADO o EN_PREPARACION antes de ser DESPACHADO.",
       );
       return;
     }
@@ -183,32 +167,6 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
     }
   };
 
-  const handleCancelOrder = async (orderId: string) => {
-    if (
-      !window.confirm(
-        `¿Deseas cancelar el pedido #${orderId.substring(0, 8)}...?`,
-      )
-    )
-      return;
-
-    try {
-      const updatedOrder = await orderService.updateOrderStatus(
-        orderId,
-        "CANCELADO",
-        token,
-      );
-
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === orderId ? { ...o, status: updatedOrder.status } : o,
-        ),
-      );
-      alert("Pedido cancelado correctamente.");
-    } catch (error) {
-      alert("No se pudo cancelar el pedido.");
-    }
-  };
-
   const handleDeleteOrder = async (orderId: string) => {
     if (!window.confirm(`¿Seguro que deseas eliminar el pedido #${orderId}?`))
       return;
@@ -224,15 +182,12 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   const getStatusBadge = (status: OrderStatus) => {
     switch (status) {
       case "CREADO":
-      case "PENDIENTE":
         return styles.badgeInfo;
       case "ACEPTADO":
-      case "EN_PREPARACIÓN":
-      case "EN_PROCESO":
+      case "EN_PREPARACION":
         return styles.badgeWarning;
       case "DESPACHADO":
       case "ENTREGADO":
-      case "COMPLETADO":
         return styles.badgeSuccess;
       case "CANCELADO":
         return styles.badgeDanger;
@@ -250,7 +205,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
           </h1>
           <p className={styles.subtitle}>
             {isCliente
-              ? "Consulta el estado, realiza seguimiento o cancela tus compras."
+              ? "Consulta el estado actual y el historial de tus compras."
               : "Gestión de flujos de estado, despacho y administración general."}
           </p>
         </div>
@@ -270,14 +225,14 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
           <span className={styles.metricSubtitle}>Registrados</span>
         </div>
         <div className={styles.metricCard}>
-          <span className={styles.metricTitle}>Nuevos / Aceptados</span>
+          <span className={styles.metricTitle}>Nuevos</span>
           <span className={styles.metricValue}>{metrics.creados}</span>
-          <span className={styles.metricSubtitle}>Listos para preparación</span>
+          <span className={styles.metricSubtitle}>Recién ingresados</span>
         </div>
         <div className={styles.metricCard}>
-          <span className={styles.metricTitle}>En Ruta / Despacho</span>
-          <span className={styles.metricValue}>{metrics.despachados}</span>
-          <span className={styles.metricSubtitle}>En proceso operativo</span>
+          <span className={styles.metricTitle}>En Proceso / Despacho</span>
+          <span className={styles.metricValue}>{metrics.enProceso}</span>
+          <span className={styles.metricSubtitle}>En flujo operativo</span>
         </div>
         <div className={styles.metricCard}>
           <span className={styles.metricTitle}>Entregados</span>
@@ -325,7 +280,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                 <th>ESTADO ACTUAL</th>
                 <th>TOTAL</th>
                 <th style={{ textAlign: "right" }}>
-                  CAMBIAR ESTADO / ACCIONES
+                  {isCliente ? "ESTADO" : "ACCIONES Y ESTADO"}
                 </th>
               </tr>
             </thead>
@@ -349,7 +304,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                     <td>{order.customerId}</td>
                     <td>
                       <span className={getStatusBadge(order.status)}>
-                        {order.status}
+                        {order.status.replace("_", " ")}
                       </span>
                     </td>
                     <td className={styles.boldText}>
@@ -357,39 +312,13 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                     </td>
 
                     <td className={styles.actionColumn}>
-                      {isCliente && (
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "0.5rem",
-                            justifyContent: "flex-end",
-                          }}
-                        >
-                          <button
-                            className={styles.btnLink}
-                            onClick={() =>
-                              alert(
-                                `Seguimiento del Pedido #${order.id}\nEstado: ${order.status}`,
-                              )
-                            }
-                          >
-                            Ver Seguimiento
-                          </button>
-
-                          {["CREADO", "PENDIENTE", "ACEPTADO"].includes(
-                            order.status,
-                          ) && (
-                            <button
-                              className={styles.btnDanger}
-                              onClick={() => handleCancelOrder(order.id)}
-                            >
-                              Cancelar
-                            </button>
-                          )}
+                      {isCliente ? (
+                        <div style={{ textAlign: "right" }}>
+                          <span className={getStatusBadge(order.status)}>
+                            {order.status.replace("_", " ")}
+                          </span>
                         </div>
-                      )}
-
-                      {(isOperador || isAdmin) && (
+                      ) : (
                         <div
                           style={{
                             display: "flex",
@@ -409,23 +338,17 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                             }
                           >
                             <option value="CREADO">CREADO</option>
-                            <option value="PENDIENTE">PENDIENTE</option>
                             <option value="ACEPTADO">ACEPTADO</option>
-                            <option value="EN_PREPARACIÓN">
-                              EN PREPARACIÓN
+                            <option value="EN_PREPARACION">
+                              EN PREPARACION
                             </option>
-                            <option value="EN_PROCESO">EN PROCESO</option>
                             <option
                               value="DESPACHADO"
-                              disabled={
-                                order.status === "CREADO" ||
-                                order.status === "PENDIENTE"
-                              }
+                              disabled={order.status === "CREADO"}
                             >
                               DESPACHADO
                             </option>
                             <option value="ENTREGADO">ENTREGADO</option>
-                            <option value="COMPLETADO">COMPLETADO</option>
                             <option value="CANCELADO">CANCELADO</option>
                           </select>
 

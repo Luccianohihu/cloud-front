@@ -3,13 +3,10 @@
 export type OrderStatus =
   | "CREADO"
   | "ACEPTADO"
-  | "EN_PREPARACIÓN"
+  | "EN_PREPARACION"
   | "DESPACHADO"
   | "ENTREGADO"
-  | "CANCELADO"
-  | "PENDIENTE"
-  | "EN_PROCESO"
-  | "COMPLETADO";
+  | "CANCELADO";
 
 export interface OrderItem {
   productId: string;
@@ -41,9 +38,6 @@ const getHeaders = (token?: string) => ({
   ...(token ? { Authorization: `Bearer ${token}` } : {}),
 });
 
-/**
- * Extrae la propiedad 'data' del envoltorio StandardResponse<T> de Spring Boot
- */
 const extractData = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
     const errorText = await response.text();
@@ -55,10 +49,6 @@ const extractData = async <T>(response: Response): Promise<T> => {
   return (json.data !== undefined ? json.data : json) as T;
 };
 
-/**
- * Mapea los atributos enviados por Java (clientId, orderState, unitPrice)
- * a la estructura esperada en el Frontend (customerId, status, price)
- */
 const mapToFrontendOrder = (rawOrder: any): Order => {
   return {
     id: String(rawOrder.id),
@@ -84,14 +74,12 @@ const mapToFrontendOrder = (rawOrder: any): Order => {
 };
 
 export const orderService = {
-  // 1. Obtener todos los pedidos (Operador y Administrador)
   getAllOrders: async (token?: string): Promise<Order[]> => {
     const response = await fetch(BASE_URL, { headers: getHeaders(token) });
     const rawList = await extractData<any[]>(response);
     return rawList.map(mapToFrontendOrder);
   },
 
-  // 2. Obtener pedidos por cliente específico (Cliente)
   getOrdersByCustomer: async (
     customerId: string,
     token?: string,
@@ -103,7 +91,6 @@ export const orderService = {
     return rawList.map(mapToFrontendOrder);
   },
 
-  // 3. Obtener un pedido por ID
   getOrderById: async (orderId: string, token?: string): Promise<Order> => {
     const response = await fetch(`${BASE_URL}/${orderId}`, {
       headers: getHeaders(token),
@@ -112,7 +99,6 @@ export const orderService = {
     return mapToFrontendOrder(rawOrder);
   },
 
-  // 4. Crear un nuevo pedido (Adapta payload a OrderRequest.java)
   createOrder: async (
     payload: CreateOrderPayload,
     token?: string,
@@ -136,7 +122,6 @@ export const orderService = {
     return mapToFrontendOrder(rawCreated);
   },
 
-  // 5. Actualizar estado del pedido (Adapta cuerpo a OrderStatusUpdateRequest.java)
   updateOrderStatus: async (
     orderId: string,
     status: OrderStatus,
@@ -155,7 +140,6 @@ export const orderService = {
     return mapToFrontendOrder(rawUpdated);
   },
 
-  // 6. Eliminar pedido (Exclusivo Administrador)
   deleteOrder: async (orderId: string, token?: string): Promise<void> => {
     const response = await fetch(`${BASE_URL}/${orderId}`, {
       method: "DELETE",
