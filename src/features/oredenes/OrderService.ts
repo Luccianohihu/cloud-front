@@ -154,7 +154,6 @@ export const orderService = {
     const rawUpdated = await extractData<any>(response);
     return mapToFrontendOrder(rawUpdated);
   },
-
   deleteOrder: async (orderId: string, token?: string): Promise<void> => {
     const response = await fetch(`${BASE_URL}/${orderId}`, {
       method: "DELETE",
@@ -162,7 +161,10 @@ export const orderService = {
     });
 
     if (!response.ok) {
-      throw new Error(`Error al intentar eliminar la orden #${orderId}`);
+      const errorText = await response.text().catch(() => "");
+      throw new Error(
+        `Error HTTP (${response.status}) al intentar eliminar la orden #${orderId}: ${errorText}`,
+      );
     }
   },
 };
