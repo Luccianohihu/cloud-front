@@ -1,0 +1,62 @@
+.loginPage {
+  display: flex;
+  min-height: 100vh;
+  width: 100vw;
+}
+
+/* Lado Izquierdo */
+.brandHero {
+  flex: 1;
+  background-color: #4f46e5;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  padding-left: 10%;
+}
+
+.brandContent h1 {
+  font-size: 5rem;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0;
+}
+
+/* Lado Derecho */
+.loginSection {
+  flex: 1;
+  background-color: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loginCard {
+  width: 100%;
+  max-width: 380px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.loginCard h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+}
+
+.loginSubtitle {
+  color: #64748b;
+  font-size: 0.875rem;
+  margin-bottom: 2rem;
+}
+
+.securityNotice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  color: #64748b;
+  font-size: 0.75rem;
+}
