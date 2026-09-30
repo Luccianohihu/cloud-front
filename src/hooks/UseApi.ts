@@ -2,10 +2,10 @@
 
 import { useAuth } from "../context/AuthContext";
 
-const BFF_BASE_URL = "http://localhost:8080"; // URL de tu Spring Boot BFF
+const BFF_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080"; // URL de tu Spring Boot BFF
 
 export const useApi = () => {
-  const { accessToken } = useAuth();
+const { token: accessToken } = useAuth();
 
   const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
     const headers = {
