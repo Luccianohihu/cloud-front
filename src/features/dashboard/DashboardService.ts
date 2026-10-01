@@ -31,7 +31,7 @@ export interface GeneralSummary {
   lowStockProducts: Product[];
 }
 
-const ORDERS_URL = "http://localhost:8080/api/v1/orders";
+const ORDERS_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1/orders";
 const PRODUCTS_URL = "http://localhost:8080/api/v1/products";
 
 const getHeaders = (token?: string) => ({
