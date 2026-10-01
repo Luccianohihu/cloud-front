@@ -31,8 +31,9 @@ export interface GeneralSummary {
   lowStockProducts: Product[];
 }
 
-const ORDERS_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1/orders";
-const PRODUCTS_URL = "http://localhost:8080/api/v1/products";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+const ORDERS_URL = `${API_BASE}/api/v1/orders`;
+const PRODUCTS_URL = `${API_BASE}/api/v1/products`;
 
 const getHeaders = (token?: string) => ({
   "Content-Type": "application/json",
