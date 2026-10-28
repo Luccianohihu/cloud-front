@@ -1,12 +1,22 @@
-import React, { useState, useEffect, useMemo } from "react";
+﻿import React, { useState, useEffect, useMemo, useCallback } from "react";
 import styles from "./OrderDashboard.module.css";
 import {
   orderService,
-  type CreateOrderPayload,
   type Order,
   type OrderStatus,
 } from "./OrderService";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
+import { dashboardService } from "../dashboard/DashboardService";
+
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0,
+  }).format(amount);
+
+const formatClientId = (clientId: string) =>
+  clientId && clientId !== "N/A" ? `${clientId.slice(0, 8)}…` : "—";
 
 export type UserRole =
   | "ROLE_CLIENTE"
@@ -18,13 +28,11 @@ export type UserRole =
 
 interface OrdersDashboardProps {
   userRole?: UserRole;
-  userId?: string;
   accessToken?: string;
 }
 
 export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   userRole: propRole,
-  userId: propUserId,
   accessToken: propToken,
 }) => {
   const {
@@ -52,55 +60,92 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   const isAdmin = roleString.includes("ADMINISTRADOR");
   const isCliente = roleString.includes("CLIENTE") && !isOperador && !isAdmin;
 
-  // Prioriza username sobre ID para garantizar coincidencia con la base de datos
-  const userId =
-    propUserId || contextUser?.username || contextUser?.id || "CLI-UNKNOWN";
-
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>("TODOS");
-  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
-  const [newOrderTotal, setNewOrderTotal] = useState<number>(15000);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
+  const [summaryCounts, setSummaryCounts] = useState<Record<string, number>>({});
+  const [summaryTotalOrders, setSummaryTotalOrders] = useState<number | null>(null);
 
   useEffect(() => {
-    // Si aún no hay token cargado, detener ejecución
-    if (!token) return;
+    if (!token || (!isOperador && !isAdmin)) return;
+    let active = true;
+    void dashboardService.getOrderSummaryMetrics(token).then((summary) => {
+      if (!active) return;
+      setSummaryCounts(summary.statusCounts);
+      setSummaryTotalOrders(summary.totalOrders);
+    }).catch((error) => {
+      console.error("No se pudieron cargar los contadores de órdenes:", error);
+    });
+    return () => {
+      active = false;
+    };
+  }, [token, isOperador, isAdmin]);
+  
+  const fetchOrders = useCallback(async () => {
+  setLoading(true);
+  if (!token) {
+    setOrders([]);
+    setTotalElements(0);
+    setTotalPages(1);
+    setLoading(false);
+    return;
+  }
 
-    fetchOrders();
-  }, [roleString, userId, token]);
-
-  const fetchOrders = async () => {
-    setLoading(true);
-    try {
-      let data: Order[] = [];
-      if (isOperador || isAdmin) {
-        data = await orderService.getAllOrders(token);
-      } else {
-        data = await orderService.getOrdersByCustomer(userId, token);
-      }
+  try {
+    if (isOperador || isAdmin) {
+      const statusByTab: Record<string, OrderStatus> = {
+        CREADOS: "CREADO",
+        ENTREGADOS: "ENTREGADO",
+        CANCELADOS: "CANCELADO",
+      };
+      const result = await orderService.getOrdersPage(
+        token,
+        pageIndex,
+        10,
+        statusByTab[activeTab],
+      );
+      setOrders(result.content);
+      setTotalElements(result.totalElements);
+      setTotalPages(Math.max(1, result.totalPages));
+    } else {
+      const data = await orderService.getOrdersByCustomer(token);
       setOrders(data);
-    } catch (error) {
-      console.error("Error al cargar pedidos:", error);
-    } finally {
-      setLoading(false);
+      setTotalElements(data.length);
+      setTotalPages(1);
     }
-  };
+  } catch (error) {
+    console.error("Error al cargar pedidos:", error);
+  } finally {
+    setLoading(false);
+  }
+}, [isOperador, isAdmin, token, pageIndex, activeTab]);
 
+  useEffect(() => {
+  void fetchOrders();
+}, [fetchOrders]);
+
+  
   const metrics = useMemo(() => {
     return {
-      total: orders.length,
-      creados: orders.filter((o) => o.status === "CREADO").length,
-      enProceso: orders.filter(
-        (o) =>
-          o.status === "ACEPTADO" ||
-          o.status === "EN_PREPARACION" ||
-          o.status === "DESPACHADO",
-      ).length,
-      entregados: orders.filter((o) => o.status === "ENTREGADO").length,
-      cancelados: orders.filter((o) => o.status === "CANCELADO").length,
+      total: isOperador || isAdmin ? summaryTotalOrders ?? totalElements : orders.length,
+      creados: isOperador || isAdmin
+        ? summaryCounts.CREADO ?? orders.filter((o) => o.status === "CREADO").length
+        : orders.filter((o) => o.status === "CREADO").length,
+      enProceso: isOperador || isAdmin
+        ? (summaryCounts.ACEPTADO || 0) + (summaryCounts.EN_PREPARACION || 0) + (summaryCounts.DESPACHADO || 0)
+        : orders.filter((o) => ["ACEPTADO", "EN_PREPARACION", "DESPACHADO"].includes(o.status)).length,
+      entregados: isOperador || isAdmin
+        ? summaryCounts.ENTREGADO ?? orders.filter((o) => o.status === "ENTREGADO").length
+        : orders.filter((o) => o.status === "ENTREGADO").length,
+      cancelados: isOperador || isAdmin
+        ? summaryCounts.CANCELADO ?? orders.filter((o) => o.status === "CANCELADO").length
+        : orders.filter((o) => o.status === "CANCELADO").length,
     };
-  }, [orders]);
+  }, [orders, isOperador, isAdmin, totalElements, summaryCounts, summaryTotalOrders]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -128,6 +173,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
     currentStatus: OrderStatus,
     newStatus: OrderStatus,
   ) => {
+    if (newStatus === "ACEPTADO" || newStatus === "CANCELADO") return;
     if (newStatus === "DESPACHADO" && currentStatus === "CREADO") {
       alert(
         "Regla de Negocio: Un pedido debe estar en estado ACEPTADO o EN_PREPARACION antes de ser DESPACHADO.",
@@ -153,33 +199,28 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
     }
   };
 
-  const handleCreateOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAcceptOrder = async (orderId: string) => {
     try {
-      const payload: CreateOrderPayload = {
-        customerId: userId,
-        total: newOrderTotal,
-        items: [{ productId: "PROD-001", quantity: 1, price: newOrderTotal }],
-      };
-
-      const createdOrder = await orderService.createOrder(payload, token);
-      setOrders((prev) => [createdOrder, ...prev]);
-      setShowCreateModal(false);
-      alert("¡Pedido creado exitosamente!");
-    } catch (error) {
-      alert("Error al crear el pedido en el servidor.");
+      const accepted = await orderService.acceptOrder(orderId, token);
+      setOrders((prev) => prev.map((order) =>
+        order.id === orderId
+          ? { ...order, ...(accepted || {}), status: "ACEPTADO" }
+          : order,
+      ));
+    } catch {
+      alert("No se pudo aceptar el pedido ni descontar su stock.");
     }
   };
 
-  const handleDeleteOrder = async (orderId: string) => {
-    if (!window.confirm(`¿Seguro que deseas eliminar el pedido #${orderId}?`))
-      return;
-
+  const handleCancelOrder = async (orderId: string) => {
+    if (!window.confirm("¿Seguro que deseas cancelar el pedido #" + orderId + "?")) return;
     try {
-      await orderService.deleteOrder(orderId, token);
-      setOrders((prev) => prev.filter((o) => o.id !== orderId));
-    } catch (error) {
-      alert("Error al intentar eliminar el pedido.");
+      await orderService.cancelOrder(orderId, token);
+      setOrders((prev) => prev.map((order) =>
+        order.id === orderId ? { ...order, status: "CANCELADO" } : order,
+      ));
+    } catch {
+      alert("Error al intentar cancelar el pedido.");
     }
   };
 
@@ -256,7 +297,10 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                   className={
                     activeTab === tab ? styles.tabActive : styles.tabButton
                   }
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => {
+                    setActiveTab(tab);
+                    setPageIndex(0);
+                  }}
                 >
                   {tab.replace("_", " ")}
                 </button>
@@ -298,14 +342,14 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                       #{order.id.substring(0, 8)}...
                     </td>
                     <td>{order.createdAt}</td>
-                    <td>{order.customerId}</td>
+                    <td>{formatClientId(order.customerId)}</td>
                     <td>
                       <span className={getStatusBadge(order.status)}>
                         {order.status.replace("_", " ")}
                       </span>
                     </td>
                     <td className={styles.boldText}>
-                      €{order.total.toFixed(2)}
+                      {formatCurrency(order.total)}
                     </td>
 
                     <td className={styles.actionColumn}>
@@ -323,39 +367,40 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                             alignItems: "center",
                           }}
                         >
-                          <select
-                            className={styles.statusSelect}
-                            value={order.status}
-                            onChange={(e) =>
-                              handleStatusChange(
-                                order.id,
-                                order.status,
-                                e.target.value as OrderStatus,
-                              )
-                            }
-                          >
-                            <option value="CREADO">CREADO</option>
-                            <option value="ACEPTADO">ACEPTADO</option>
-                            <option value="EN_PREPARACION">
-                              EN PREPARACION
-                            </option>
-                            <option
-                              value="DESPACHADO"
-                              disabled={order.status === "CREADO"}
+                          {order.status === "CREADO" && (
+                            <button
+                              className={styles.btnPrimary}
+                              onClick={() => void handleAcceptOrder(order.id)}
                             >
-                              DESPACHADO
-                            </option>
-                            <option value="ENTREGADO">ENTREGADO</option>
-                            <option value="CANCELADO">CANCELADO</option>
-                          </select>
+                              Aceptar
+                            </button>
+                          )}
+                          {order.status !== "CREADO" && order.status !== "CANCELADO" && (
+                            <select
+                              className={styles.statusSelect}
+                              value={order.status}
+                              onChange={(e) =>
+                                handleStatusChange(
+                                  order.id,
+                                  order.status,
+                                  e.target.value as OrderStatus,
+                                )
+                              }
+                            >
+                              <option value={order.status}>{order.status}</option>
+                              <option value="EN_PREPARACION">EN PREPARACION</option>
+                              <option value="DESPACHADO">DESPACHADO</option>
+                              <option value="ENTREGADO">ENTREGADO</option>
+                            </select>
+                          )}
 
-                          {isAdmin && (
+                          {order.status !== "CANCELADO" && order.status !== "ENTREGADO" && (
                             <button
                               className={styles.btnDanger}
-                              onClick={() => handleDeleteOrder(order.id)}
+                              onClick={() => void handleCancelOrder(order.id)}
                               style={{ marginLeft: "0.5rem" }}
                             >
-                              Eliminar
+                              Cancelar
                             </button>
                           )}
                         </div>
@@ -367,44 +412,27 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
             </tbody>
           </table>
         )}
+        {(isOperador || isAdmin) && totalPages > 1 && (
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", alignItems: "center", marginTop: "1rem" }}>
+            <button
+              className={styles.tabButton}
+              disabled={pageIndex === 0}
+              onClick={() => setPageIndex((current) => Math.max(0, current - 1))}
+            >
+              Anterior
+            </button>
+            <span>Página {pageIndex + 1} de {totalPages}</span>
+            <button
+              className={styles.tabButton}
+              disabled={pageIndex + 1 >= totalPages}
+              onClick={() => setPageIndex((current) => Math.min(totalPages - 1, current + 1))}
+            >
+              Siguiente
+            </button>
+          </div>
+        )}
       </div>
 
-      {showCreateModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <h3>Crear Nuevo Pedido</h3>
-            <form onSubmit={handleCreateOrder}>
-              <label>
-                Monto Total (€):
-                <input
-                  type="number"
-                  className={styles.searchInput}
-                  style={{ width: "100%", marginTop: "0.5rem" }}
-                  value={newOrderTotal}
-                  onChange={(e) => setNewOrderTotal(Number(e.target.value))}
-                  required
-                />
-              </label>
-              <div style={{ marginTop: "1.5rem", textAlign: "right" }}>
-                <button
-                  type="button"
-                  className={styles.tabButton}
-                  onClick={() => setShowCreateModal(false)}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className={styles.btnPrimary}
-                  style={{ marginLeft: "0.5rem" }}
-                >
-                  Confirmar y Guardar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

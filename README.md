@@ -1,6 +1,6 @@
 # 🚀 Cloud Front
 
-Cloud Front es una aplicación frontend moderna construida con React, TypeScript y Vite. Diseñada como una interfaz web escalable y responsive que integra autenticación segura a través de AWS Amplify, proporcionando una experiencia de usuario fluida con navegación intuitiva y componentes reutilizables.
+Cloud Front es una aplicación frontend moderna construida con React 18, TypeScript y Vite. La autenticación usa redirección a AWS Cognito Hosted UI mediante OAuth 2.0; el frontend procesa el callback y envía el token Bearer al BFF.
 
 La solución está pensada para operar de forma desacoplada con microservicios backend, manteniendo una arquitectura modular y orientada a componentes que facilita el mantenimiento, la escalabilidad y la evolución del código.
 
@@ -11,7 +11,7 @@ La solución está pensada para operar de forma desacoplada con microservicios b
 El proyecto está estructurado siguiendo principios de arquitectura limpia y atomic design:
 
 1. **Características principales:**
-   - Autenticación segura integrada con AWS Amplify
+   - Autenticación mediante AWS Cognito Hosted UI
    - Dashboard de control administrativo
    - Catálogo de productos interactivo
    - Gestión de órdenes y pedidos
@@ -72,11 +72,11 @@ cloud-front/
 
 ## 🧩 Tecnologías principales
 
-- **React 19** - Librería UI moderna con arquitectura de componentes
+- **React 18.3** - Librería UI moderna con arquitectura de componentes
 - **TypeScript 6** - Tipado estático para mayor seguridad
 - **Vite 8** - Bundler de desarrollo ultrarrápido
 - **React Router 7** - Enrutamiento navegacional
-- **AWS Amplify** - Autenticación y servicios backend
+- **AWS Cognito Hosted UI** - Inicio de sesión OAuth 2.0
 - **Lucide React** - Librería de iconos vectoriales
 - **Oxlint** - Linter estricto para calidad de código
 - **CSS Modules** - Estilos encapsulados a nivel de componente
@@ -90,7 +90,7 @@ Antes de ejecutar el proyecto, asegúrate de tener instalado:
 - **Node.js** versión 16 o superior
 - **npm** o **yarn** para gestión de dependencias
 - **Git** para control de versiones
-- Cuenta en **AWS** con configuración de Amplify (opcional para desarrollo local)
+- Cliente de aplicación de **Amazon Cognito** con Hosted UI y variables de entorno configuradas
 
 ---
 
@@ -148,7 +148,7 @@ Oxlint verificará el código TypeScript y React en busca de errores y malas pr�
 ## 🎯 Características principales
 
 ### 🔐 Autenticación
-- Integración con AWS Amplify para login seguro
+- Inicio de sesión mediante redirección a Cognito Hosted UI y callback OAuth
 - Página de callback para manejo de redirecciones OAuth
 - Contexto global `AuthContext` para gestión de sesión
 
@@ -183,7 +183,7 @@ Este proyecto busca aplicar buenas prácticas de desarrollo frontend:
 - **Tipado fuerte** con TypeScript para prevenir errores
 - **Arquitectura modular** que facilita testing y mantenimiento
 - **Performance optimizado** con Vite y lazy loading
-- **Seguridad** integrada con AWS Amplify y autenticación OAuth2
+- **Autenticación** mediante Cognito Hosted UI; el frontend envía el token Bearer al BFF
 
 ---
 
@@ -198,4 +198,4 @@ El repositorio presenta una base sólida para una aplicación frontend moderna y
 - **Repositorio:** https://github.com/Luccianohihu/cloud-front
 - **Documentación de Vite:** https://vite.dev
 - **Documentación de React:** https://react.dev
-- **AWS Amplify Docs:** https://docs.amplify.aws
+- **Amazon Cognito Docs:** https://docs.aws.amazon.com/cognito/

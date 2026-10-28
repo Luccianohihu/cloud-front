@@ -1,0 +1,91 @@
+.bar {
+  min-height: 64px;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.brand {
+  color: #111827;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.username,
+.status {
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.navigation {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.navigation a {
+  color: #374151;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.navigation a:hover {
+  color: #1d4ed8;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 40px;
+  padding: 0.5rem 0.9rem;
+  border: 0;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: #1d4ed8;
+}
+
+@media (max-width: 600px) {
+  .bar {
+    min-height: 56px;
+    padding: 0 1rem;
+  }
+
+  .account {
+    gap: 0.7rem;
+  }
+
+  .navigation {
+    gap: 0.65rem;
+  }
+
+  .navigation a,
+  .username {
+    font-size: 0.75rem;
+  }
+
+  .button {
+    min-height: 36px;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.75rem;
+  }
+}

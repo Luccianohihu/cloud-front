@@ -1,30 +1,40 @@
-// src/App.tsx
+
 import { Route, Routes } from "react-router-dom";
 import "./App.css";
-import { LoginPage } from "./features/login/LoginPage";
-import { DashboardPage } from "./features/dashboard/DashboardPage";
-import { CatalogPage } from "./features/catalogo/CatalogoPage";
-import { OrdersDashboard } from "./features/oredenes/OrderDashboard";
+
 import { CallbackPage } from "./features/callback/CallbackPage";
-import Test from "./features/test/Test";
+import { CatalogPage } from "./features/catalogo/CatalogoPage";
+import { DashboardPage } from "./features/dashboard/DashboardPage";
+import { OrdersDashboard } from "./features/ordenes/OrderDashboard";
+import { LoginPage } from "./features/login/LoginPage";
 import { MainLayout } from "./shared/ui/layout/sidebar/MainLayout";
+import { ProtectedRoute } from "./shared/ui/auth/ProtectedRoute";
+import { AuthBar } from "./shared/ui/layout/AuthBar";
 
-function App() {
+export default function App() {
   return (
+    <>
+    <AuthBar />
     <Routes>
-      {/* Rutas sin Sidebar */}
-      <Route path="/" element={<LoginPage />} />
-      <Route path="/callback" element={<CallbackPage />} />
-      <Route path="/test" element={<Test />} />
+      {/* Página inicial: catálogo público */}
+      <Route path="/" element={<CatalogPage />} />
+      <Route path="/catalogo" element={<CatalogPage />} />
+      <Route path="/login" element={<LoginPage />} />
 
-      {/* Rutas con Sidebar (Layout Global) */}
-      <Route element={<MainLayout />}>
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/catalogo" element={<CatalogPage />} />
-        <Route path="/orders" element={<OrdersDashboard />} />
+      {/* Retorno de autenticación de Keycloak */}
+      <Route path="/callback" element={<CallbackPage />} />
+
+      {/* Rutas protegidas */}
+      <Route element={<ProtectedRoute />}>
+        <Route element={<MainLayout />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/orders" element={<OrdersDashboard />} />
+        </Route>
       </Route>
+
+      {/* Ruta desconocida */}
+      <Route path="*" element={<CatalogPage />} />
     </Routes>
+    </>
   );
 }
-
-export default App;

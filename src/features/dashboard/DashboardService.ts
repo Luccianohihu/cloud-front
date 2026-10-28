@@ -13,7 +13,6 @@ export interface Order {
   customerId: string;
 }
 
-// Métricas exclusivas del cliente
 export interface ClienteMetrics {
   totalOrders: number;
   inProgressOrders: number;
@@ -22,34 +21,36 @@ export interface ClienteMetrics {
   latestOrder: Order | null;
 }
 
-// Resumen general compartido entre Operador y Admin
 export interface GeneralSummary {
   totalOrders: number;
-  pendingOrders: number;
-  deliveredOrders: number;
+  totalRevenue: number;
+  statusCounts: Record<string, number>;
   recentOrders: Order[];
-  lowStockProducts: Product[];
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
-const ORDERS_URL = `${API_BASE}/api/v1/orders`;
-const PRODUCTS_URL = `${API_BASE}/api/v1/products`;
+export type OrderSummaryMetrics = Omit<GeneralSummary, "recentOrders">;
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8083/api/v1";
+const ORDERS_URL = `${API_BASE}/orders`;
 
 const getHeaders = (token?: string) => ({
   "Content-Type": "application/json",
   ...(token ? { Authorization: `Bearer ${token}` } : {}),
 });
 
-const extractData = async <T>(response: Response): Promise<T> => {
+const readData = async (response: Response): Promise<any> => {
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Error HTTP (${response.status}): ${errorText}`);
   }
   const json = await response.json();
-  if (Array.isArray(json)) return json as unknown as T;
-  if (Array.isArray(json.content)) return json.content as unknown as T;
-  if (Array.isArray(json.data)) return json.data as unknown as T;
-  return (json.data !== undefined ? json.data : json) as T;
+  return json?.data !== undefined ? json.data : json;
+};
+
+const readList = (data: any): any[] => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.content)) return data.content;
+  return [];
 };
 
 const mapToOrder = (raw: any): Order => ({
@@ -60,97 +61,64 @@ const mapToOrder = (raw: any): Order => ({
         month: "short",
         day: "numeric",
       })
-    : new Date().toLocaleDateString("es-ES"),
-  status: String(raw.orderState || raw.status || "CREADO"),
+    : "",
+  status: String(raw.status || raw.orderState || "CREADO"),
   total: Number(raw.total || 0),
   customerId: String(raw.clientId || raw.customerId || "N/A"),
 });
 
-const mapToProduct = (raw: any): Product => ({
-  id: String(raw.id),
-  name: raw.name || "Producto sin nombre",
-  price: Number(raw.price || 0),
-  stock: Number(raw.stock || 0),
-});
+const fetchOrderSummaryMetrics = async (
+  token?: string,
+): Promise<OrderSummaryMetrics> => {
+  const response = await fetch(`${ORDERS_URL}/dashboard/summary`, {
+    headers: getHeaders(token),
+  });
+  const summary = await readData(response);
+  const statusCounts = Object.fromEntries(
+    Object.entries(summary.statusCounts || {}).map(([status, count]) => [
+      status,
+      Number(count),
+    ]),
+  );
+  return {
+    totalOrders: Number(summary.totalOrders || 0),
+    totalRevenue: Number(summary.totalRevenue || 0),
+    statusCounts,
+  };
+};
 
 export const dashboardService = {
-  // 1. Obtiene las métricas individuales del Cliente
-  getClienteMetrics: async (
-    customerId?: string,
-    token?: string,
-  ): Promise<ClienteMetrics> => {
-    const query =
-      customerId && customerId !== "CLI-UNKNOWN"
-        ? `?customerId=${customerId}`
-        : "";
+  getOrderSummaryMetrics: fetchOrderSummaryMetrics,
 
-    const res = await fetch(`${ORDERS_URL}${query}`, {
+  getClienteMetrics: async (token?: string): Promise<ClienteMetrics> => {
+    const response = await fetch(`${ORDERS_URL}/me`, {
       headers: getHeaders(token),
     });
-
-    const rawOrders = await extractData<any[]>(res);
-    const list = Array.isArray(rawOrders) ? rawOrders : [];
-    const orders = list.map(mapToOrder);
-
-    const deliveredOrders = orders.filter(
-      (o) => o.status === "ENTREGADO",
+    const orders = readList(await readData(response)).map(mapToOrder);
+    const deliveredOrders = orders.filter((order) => order.status === "ENTREGADO").length;
+    const inProgressOrders = orders.filter((order) =>
+      ["CREADO", "ACEPTADO", "EN_PREPARACION", "DESPACHADO"].includes(order.status),
     ).length;
-    const inProgressOrders = orders.filter((o) =>
-      [
-        "CREADO",
-        "ACEPTADO",
-        "EN_PREPARACIÓN",
-        "EN_PREPARACION",
-        "DESPACHADO",
-      ].includes(o.status),
-    ).length;
-    const totalSpent = orders.reduce((sum, o) => sum + o.total, 0);
-    const latestOrder = orders.length > 0 ? orders[0] : null;
 
     return {
       totalOrders: orders.length,
       inProgressOrders,
       deliveredOrders,
-      totalSpent,
-      latestOrder,
+      totalSpent: orders.reduce((sum, order) => sum + order.total, 0),
+      latestOrder: orders[0] || null,
     };
   },
 
-  // 2. Resumen general para Admin y Operador
   getGeneralSummary: async (token?: string): Promise<GeneralSummary> => {
-    const [ordersRes, productsRes] = await Promise.all([
-      fetch(`${ORDERS_URL}/all`, { headers: getHeaders(token) }).catch(
-        () => null,
-      ),
-      fetch(PRODUCTS_URL, { headers: getHeaders(token) }).catch(() => null),
+    const [summary, recentOrders] = await Promise.all([
+      fetchOrderSummaryMetrics(token),
+      fetch(`${ORDERS_URL}?page=0&size=5&sort=createdAt,desc`, {
+        headers: getHeaders(token),
+      }).then(readData),
     ]);
-
-    let orders: Order[] = [];
-    if (ordersRes && ordersRes.ok) {
-      const rawOrders = await extractData<any[]>(ordersRes);
-      const list = Array.isArray(rawOrders) ? rawOrders : [];
-      orders = list.map(mapToOrder);
-    }
-
-    let products: Product[] = [];
-    if (productsRes && productsRes.ok) {
-      const rawProducts = await extractData<any[]>(productsRes);
-      const list = Array.isArray(rawProducts) ? rawProducts : [];
-      products = list.map(mapToProduct);
-    }
-
-    const lowStockProducts = products.filter((p) => p.stock < 5);
-
     return {
-      totalOrders: orders.length,
-      pendingOrders: orders.filter((o) =>
-        ["CREADO", "ACEPTADO", "EN_PREPARACIÓN", "EN_PREPARACION"].includes(
-          o.status,
-        ),
-      ).length,
-      deliveredOrders: orders.filter((o) => o.status === "ENTREGADO").length,
-      recentOrders: orders.slice(0, 5),
-      lowStockProducts: lowStockProducts.slice(0, 5),
+      ...summary,
+      recentOrders: readList(recentOrders).map(mapToOrder),
     };
   },
 };

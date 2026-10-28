@@ -1,129 +1,115 @@
-// src/context/AuthContext.tsx
-import React, { createContext, useCallback, useContext, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import Keycloak from "keycloak-js";
+import { AuthContext, type User } from "./auth-context";
 
-const COGNITO_DOMAIN = import.meta.env.VITE_COGNITO_DOMAIN;
-const CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID;
-const REDIRECT_URI = import.meta.env.VITE_COGNITO_REDIRECT_URI;
+const keycloak = new Keycloak({
+  url: import.meta.env.VITE_KEYCLOAK_URL || "http://localhost:8080",
+  realm: import.meta.env.VITE_KEYCLOAK_REALM || "pedidos360",
+  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || "pedidos360",
+});
+let initialization: Promise<boolean> | undefined;
 
-export interface User {
-  id: string;
-  username: string;
-  email?: string;
-}
-
-interface AuthContextType {
-  token: string | null;
-  role: string | null;
-  user: User | null;
-  login: () => void;
-  logout: () => void;
-  saveTokenFromUrl: (rawHash?: string) => boolean;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const initializeKeycloak = () =>
+  (initialization ??= keycloak.init({
+    onLoad: "check-sso",
+    pkceMethod: "S256",
+    checkLoginIframe: false,
+    silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
+    silentCheckSsoFallback: false,
+  }));
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [token, setToken] = useState<string | null>(
-    localStorage.getItem("token"),
-  );
-  const [role, setRole] = useState<string | null>(localStorage.getItem("role"));
-  const [user, setUser] = useState<User | null>(() => {
-    const savedUser = localStorage.getItem("user");
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  const [token, setToken] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const parseJwt = (tokenStr: string) => {
-    try {
-      const base64Url = tokenStr.split(".")[1];
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split("")
-          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-          .join(""),
-      );
-      return JSON.parse(jsonPayload);
-    } catch (e) {
-      console.error("Error al parsear el JWT:", e);
-      return null;
-    }
-  };
-
-  // Memoizamos saveTokenFromUrl para mantener su referencia estable
-  const saveTokenFromUrl = useCallback((rawHash?: string): boolean => {
-    const hashToParse = rawHash || window.location.hash;
-    if (!hashToParse) return false;
-
-    const cleanHash = hashToParse.startsWith("#")
-      ? hashToParse.substring(1)
-      : hashToParse;
-
-    const params = new URLSearchParams(cleanHash);
-    const accessToken = params.get("access_token");
-    const idToken = params.get("id_token");
-
-    if (accessToken) {
-      const payload = parseJwt(accessToken);
-      const idPayload = idToken ? parseJwt(idToken) : null;
-
-      if (payload) {
-        const userRoles = payload["cognito:groups"] || [];
-        let primaryRole = userRoles[0] || "ROLE_CLIENTE";
-        if (!primaryRole.startsWith("ROLE_")) {
-          primaryRole = `ROLE_${primaryRole.toUpperCase()}`;
-        }
-
-        const username = payload["username"] || payload["sub"] || "CLI-001";
-        const email = idPayload?.email || payload["email"] || "";
-
-        const userInfo: User = {
-          id: payload["sub"] || username,
-          username,
-          email,
-        };
-
-        setToken(accessToken);
-        setRole(primaryRole);
-        setUser(userInfo);
-
-        localStorage.setItem("token", accessToken);
-        localStorage.setItem("role", primaryRole);
-        localStorage.setItem("user", JSON.stringify(userInfo));
-
-        return true;
-      }
-    }
-
-    return false;
+  const syncSession = useCallback(() => {
+    const claims = keycloak.tokenParsed;
+    const roles = [
+      ...(claims?.realm_access?.roles ?? []),
+      ...(claims?.resource_access?.[keycloak.clientId ?? ""]?.roles ?? []),
+    ];
+    const knownRole = roles.find((candidate) =>
+      ["ADMINISTRADOR", "OPERADOR", "CLIENTE", "ROLE_ADMINISTRADOR", "ROLE_OPERADOR", "ROLE_CLIENTE"].includes(candidate.toUpperCase()),
+    );
+    const firstRole = knownRole ?? roles.find((candidate) =>
+      !["OFFLINE_ACCESS", "UMA_AUTHORIZATION"].includes(candidate.toUpperCase()) &&
+      !candidate.toUpperCase().startsWith("DEFAULT-ROLES"),
+    );
+    setToken(keycloak.token ?? null);
+    setRole(
+      firstRole
+        ? firstRole.startsWith("ROLE_")
+          ? firstRole
+          : `ROLE_${firstRole.toUpperCase()}`
+        : null,
+    );
+    setUser(
+      claims
+        ? {
+            id: claims.sub ?? "",
+            username: claims.preferred_username ?? claims.sub ?? "",
+            email: claims.email,
+          }
+        : null,
+    );
   }, []);
 
-  const login = useCallback(() => {
-    const cognitoUrl = `${COGNITO_DOMAIN}/login?client_id=${CLIENT_ID}&response_type=token&scope=email+openid+profile&redirect_uri=${encodeURIComponent(
-      REDIRECT_URI,
-    )}`;
-    window.location.href = cognitoUrl;
-  }, []);
+  useEffect(() => {
+    let mounted = true;
+    keycloak.onAuthSuccess = syncSession;
+    keycloak.onAuthRefreshSuccess = syncSession;
+    keycloak.onAuthLogout = syncSession;
+    keycloak.onTokenExpired = () => {
+      void keycloak.updateToken(30).then(syncSession).catch(() => keycloak.logout());
+    };
 
+    void initializeKeycloak()
+      .then(() => {
+        if (mounted) syncSession();
+      })
+      .catch((error: unknown) => {
+        console.error("No se pudo inicializar Keycloak:", error);
+      })
+      .finally(() => {
+        if (mounted) setIsLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [syncSession]);
+
+  useEffect(() => {
+    if (!token) return;
+    const refreshTimer = window.setInterval(() => {
+      void keycloak.updateToken(30).then(syncSession).catch(() => keycloak.logout());
+    }, 20_000);
+    return () => window.clearInterval(refreshTimer);
+  }, [token, syncSession]);
+
+  const saveTokenFromUrl = useCallback(() => Boolean(keycloak.authenticated), []);
+  const login = useCallback((returnTo = "/dashboard") => {
+    const safeReturnTo = returnTo.startsWith("/") && !returnTo.startsWith("//")
+      ? returnTo
+      : "/dashboard";
+    sessionStorage.setItem("auth:returnTo", safeReturnTo);
+    void keycloak.login({ redirectUri: `${window.location.origin}/callback` });
+  }, []);
   const logout = useCallback(() => {
-    setToken(null);
-    setRole(null);
-    setUser(null);
-    localStorage.clear();
+    void keycloak.logout({
+      redirectUri: `${window.location.origin}/catalogo`,
+    });
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{ token, role, user, login, logout, saveTokenFromUrl }}
+      value={{ token, role, user, isLoading, login, logout, saveTokenFromUrl }}
     >
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth debe usarse dentro de AuthProvider");
-  return context;
 };

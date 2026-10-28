@@ -71,6 +71,7 @@
   border-radius: 12px;
   border: 1px solid #e5e7eb;
   padding: 1.25rem;
+  min-width: 0;
 }
 
 .filterBar {
@@ -116,6 +117,25 @@
 .table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.table th,
+.table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table th:nth-child(1) { width: 12%; }
+.table th:nth-child(2) { width: 16%; }
+.table th:nth-child(3) { width: 14%; }
+.table th:nth-child(4) { width: 13%; }
+.table th:nth-child(5) { width: 12%; }
+.table th:nth-child(6) { width: 33%; }
+
+.table td {
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 .table th {
@@ -208,6 +228,21 @@
   cursor: pointer;
 }
 
+.btnPrimary {
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnPrimary:hover {
+  background-color: #1d4ed8;
+}
+
 .btnDanger:hover {
   background-color: #dc2626;
 }
@@ -216,4 +251,32 @@
   text-align: center;
   padding: 2rem;
   color: #6b7280;
+}
+
+@media (max-width: 900px) {
+  .dashboardContainer {
+    padding: 1rem;
+  }
+
+  .filterBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .searchInput {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .tabs {
+    overflow-x: auto;
+  }
+
+  .table {
+    min-width: 850px;
+  }
+
+  .sectionCard {
+    overflow-x: auto;
+  }
 }

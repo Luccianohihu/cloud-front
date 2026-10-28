@@ -1,39 +1,29 @@
-// src/pages/callback/CallbackPage.tsx
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 
 export const CallbackPage: React.FC = () => {
-  const { saveTokenFromUrl } = useAuth();
+  const { token, role, isLoading } = useAuth();
   const navigate = useNavigate();
-  const hasProcessed = useRef(false); // Guard para evitar la doble ejecución
 
   useEffect(() => {
-    // Si ya se procesó en la primera iteración, ignoramos ejecuciones posteriores
-    if (hasProcessed.current) return;
-
-    const currentHash = window.location.hash;
-
-    if (currentHash && currentHash.includes("access_token")) {
-      hasProcessed.current = true;
-      const isSaved = saveTokenFromUrl(currentHash);
-
-      if (isSaved) {
-        navigate("/catalogo", { replace: true });
-      } else {
-        console.error("No se pudo extraer el access_token del hash.");
-        navigate("/", { replace: true });
-      }
-    } else if (!currentHash && !hasProcessed.current) {
-      hasProcessed.current = true;
-      console.error("No hay hash en la URL.");
-      navigate("/", { replace: true });
+    if (!isLoading) {
+      const requestedPath = sessionStorage.getItem("auth:returnTo");
+      const validReturnTo = requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
+        ? requestedPath
+        : "/dashboard";
+      const isStaff = role?.toUpperCase().includes("ADMIN") || role?.toUpperCase().includes("OPERADOR");
+      const returnTo = validReturnTo === "/" || validReturnTo === "/login"
+        ? isStaff ? "/dashboard" : "/catalogo"
+        : validReturnTo;
+      sessionStorage.removeItem("auth:returnTo");
+      navigate(token ? returnTo : "/", { replace: true });
     }
-  }, [saveTokenFromUrl, navigate]);
+  }, [isLoading, token, role, navigate]);
 
   return (
     <div style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
-      <p>Autenticando con AWS Cognito...</p>
+      <p>Autenticando con Keycloak...</p>
     </div>
   );
 };

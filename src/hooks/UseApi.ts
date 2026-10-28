@@ -1,8 +1,7 @@
-// src/hooks/useApi.ts
 
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
-const BFF_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080"; // URL de tu Spring Boot BFF
+const BFF_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8083/api/v1";
 
 export const useApi = () => {
 const { token: accessToken } = useAuth();
@@ -20,10 +19,9 @@ const { token: accessToken } = useAuth();
     });
 
     if (response.status === 401) {
-      alert("Sesión expirada. Por favor vuelve a iniciar sesión.");
-      window.location.href = "/login";
-      throw new Error("No autorizado");
-    }
+  window.location.assign("/");
+  throw new Error("No autorizado");
+}
 
     if (!response.ok) {
       throw new Error(`Error en la petición: ${response.statusText}`);
