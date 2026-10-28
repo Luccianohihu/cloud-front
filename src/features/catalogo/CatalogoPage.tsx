@@ -1,55 +1,73 @@
 // src/features/catalogo/CatalogPage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Plus, Search, Edit2, Trash2, ShoppingCart } from "lucide-react";
 import { CustomButton } from "../../shared/ui/atomos/custom-button/CustomButton";
-import type { ProductCategory } from "./CatalogPage.types";
-import { catalogService, type Product } from "./CatalogService";
-import { orderService } from "../oredenes/OrderService";
-import { useAuth } from "../../context/AuthContext";
+import { catalogService, type Category, type Product } from "./CatalogService";
+import { orderService } from "../ordenes/OrderService";
+import { useAuth } from "../../context/useAuth";
 import styles from "./CatalogPage.module.css";
 
 export const CatalogPage: React.FC = () => {
-  const { token, role, user } = useAuth();
+  const { token, role, login } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [buyingProductId, setBuyingProductId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedCategory, setSelectedCategory] =
-    useState<ProductCategory>("Todos");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("Todos");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState<string>("price-asc");
+  const [categoryOptions, setCategoryOptions] = useState<Category[]>([]);
 
   const isAdmin = role === "ADMINISTRADOR" || role === "ROLE_ADMINISTRADOR";
   const isOperator = role === "OPERADOR" || role === "ROLE_OPERADOR";
   const canManageProducts = isAdmin || isOperator;
 
-  const categories: ProductCategory[] = [
-    "Todos",
-    "Calzado",
-    "Ropa",
-    "Accesorios",
-  ];
+  const categories = [{ id: "Todos", name: "Todos" }, ...categoryOptions];
 
-  useEffect(() => {
-    if (token) {
-      fetchCatalog();
-    }
-  }, [token]);
+ 
 
-  const fetchCatalog = async () => {
-    if (!token) return;
-    setLoading(true);
+const fetchCatalog = useCallback(async () => {
+  try {
+    const fetchedCategories = await catalogService.getCategories(token || undefined);
+    setCategoryOptions(fetchedCategories);
+    const categoryId = selectedCategoryId === "Todos" ? undefined : selectedCategoryId;
+    const data = await catalogService.getProducts(token || undefined, categoryId, searchTerm);
+    setProducts(data.map((product) => ({
+      ...product,
+      category: fetchedCategories.find((category) => category.id === product.categoryId)?.name || product.category,
+    })));
     setError(null);
-    try {
-      const data = await catalogService.getProducts(token);
-      setProducts(data);
-    } catch (err: any) {
-      setError("No se pudo cargar el catálogo. Intente nuevamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error) {
+    console.error("Error al cargar el catálogo:", error);
+    setError("No se pudo cargar el catálogo. Intente nuevamente.");
+  } finally {
+    setLoading(false);
+  }
+}, [token, selectedCategoryId, searchTerm]);
+
+useEffect(() => {
+  void fetchCatalog();
+}, [fetchCatalog]);
+
+const promptForCategoryId = (defaultCategoryId?: string) => {
+  if (categoryOptions.length === 0) {
+    alert("No hay categorías disponibles. Cárguelas antes de continuar.");
+    return null;
+  }
+  const options = categoryOptions.map((category, index) => `${index + 1}. ${category.name}`).join("\n");
+  const defaultIndex = Math.max(0, categoryOptions.findIndex((category) => category.id === defaultCategoryId));
+  const selection = prompt(`Seleccione una categoría indicando su número:\n${options}`, String(defaultIndex + 1));
+  if (selection === null) return null;
+  const category = categoryOptions[Number(selection) - 1];
+  if (!category) {
+    alert("La categoría seleccionada no es válida.");
+    return null;
+  }
+  return category.id;
+};
+
+
 
   const handleBuyProduct = async (product: Product) => {
     if (product.stock <= 0) {
@@ -57,7 +75,11 @@ export const CatalogPage: React.FC = () => {
       return;
     }
 
-    const customerId = user?.username || user?.id || "CLI-001";
+    if (!token) {
+      login("/catalogo");
+      return;
+    }
+
     const confirmPurchase = window.confirm(
       `¿Confirmar compra de "${product.name}" por €${product.price.toFixed(2)}?`,
     );
@@ -68,9 +90,7 @@ export const CatalogPage: React.FC = () => {
       setBuyingProductId(product.id);
       await orderService.createOrder(
         {
-          customerId,
-          total: product.price,
-          items: [{ productId: product.id, quantity: 1, price: product.price }],
+          items: [{ productId: product.id, quantity: 1, unitPrice: product.price }],
         },
         token || undefined,
       );
@@ -91,6 +111,14 @@ export const CatalogPage: React.FC = () => {
     const name = prompt("Nombre del nuevo producto:");
     if (!name || !name.trim()) return;
 
+    const defaultSku = name.trim().toUpperCase().replace(/\s+/g, "-").replace(/[^A-Z0-9_-]/g, "").slice(0, 50);
+    const sku = prompt("SKU del producto (letras, números, guion o guion bajo):", defaultSku);
+    if (sku === null || !sku.trim()) return;
+    if (sku.length > 50 || !/^[a-zA-Z0-9_-]+$/.test(sku.trim())) {
+      alert("El SKU debe tener hasta 50 caracteres y solo puede contener letras, números, guiones o guiones bajos.");
+      return;
+    }
+
     const priceInput = prompt("Precio del producto (€):", "29.99");
     if (priceInput === null) return;
     const price = parseFloat(priceInput);
@@ -98,6 +126,8 @@ export const CatalogPage: React.FC = () => {
     const stockInput = prompt("Stock inicial del producto:", "10");
     if (stockInput === null) return;
     const stock = parseInt(stockInput, 10);
+    const categoryId = promptForCategoryId();
+    if (!categoryId) return;
 
     if (isNaN(price) || price < 0 || isNaN(stock) || stock < 0) {
       alert("Por favor, ingrese valores válidos.");
@@ -107,18 +137,17 @@ export const CatalogPage: React.FC = () => {
     try {
       const newProduct = await catalogService.createProduct(
         {
+          sku: sku.trim(),
           name: name.trim(),
           price,
           stock,
-          categoryId: "6ab349854a8d5deb8a20c494",
-          imageUrl:
-            "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&q=80",
+          categoryId,
         },
         token || undefined,
       );
       setProducts((prev) => [...prev, newProduct]);
       alert("Producto creado exitosamente.");
-    } catch (err) {
+    } catch {
       alert("Error al intentar crear el producto.");
     }
   };
@@ -140,6 +169,8 @@ export const CatalogPage: React.FC = () => {
     );
     if (stockInput === null) return;
     const stock = parseInt(stockInput, 10);
+    const categoryId = promptForCategoryId(product.categoryId);
+    if (!categoryId) return;
 
     if (isNaN(price) || price < 0 || isNaN(stock) || stock < 0) {
       alert("Por favor, ingrese valores válidos.");
@@ -153,7 +184,7 @@ export const CatalogPage: React.FC = () => {
           name: name.trim() || product.name,
           price,
           stock,
-          categoryId: "6ab349854a8d5deb8a20c494",
+          categoryId,
         },
         token || undefined,
       );
@@ -162,7 +193,7 @@ export const CatalogPage: React.FC = () => {
         prev.map((p) => (p.id === product.id ? updatedProduct : p)),
       );
       alert("Producto actualizado exitosamente.");
-    } catch (err) {
+    } catch {
       alert("Error al intentar actualizar el producto.");
     }
   };
@@ -175,7 +206,7 @@ export const CatalogPage: React.FC = () => {
     try {
       await catalogService.deleteProduct(id, token || undefined);
       setProducts((prev) => prev.filter((product) => product.id !== id));
-    } catch (err) {
+    } catch  {
       alert("Error al intentar eliminar el producto.");
     }
   };
@@ -183,7 +214,7 @@ export const CatalogPage: React.FC = () => {
   const filteredProducts = products
     .filter((product) => {
       const matchesCategory =
-        selectedCategory === "Todos" || product.category === selectedCategory;
+        selectedCategoryId === "Todos" || product.categoryId === selectedCategoryId;
       const matchesSearch = product.name
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
@@ -204,6 +235,8 @@ export const CatalogPage: React.FC = () => {
         return styles.badgeBajoStock;
       case "Sin Stock":
         return styles.badgeSinStock;
+      case "Inactivo":
+        return styles.badgeInactivo;
       default:
         return styles.badgeActivo;
     }
@@ -243,15 +276,15 @@ export const CatalogPage: React.FC = () => {
           <div className={styles.categories}>
             {categories.map((cat) => (
               <button
-                key={cat}
+                key={cat.id}
                 className={
-                  selectedCategory === cat
+                  selectedCategoryId === cat.id
                     ? styles.activeChip
                     : styles.categoryChip
                 }
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => setSelectedCategoryId(cat.id)}
               >
-                {cat}
+                {cat.name}
               </button>
             ))}
           </div>

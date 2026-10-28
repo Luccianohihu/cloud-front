@@ -1,86 +1,102 @@
-// src/services/catalogService.ts
+import { API_BASE_URL } from "../../config/api";
 
-// 1. Estructura exacta que proviene del backend (ProductResponse.java)
+export interface Category {
+  id: string;
+  name: string;
+}
+
 export interface BackendProduct {
   id: string;
   name: string;
   description?: string;
   price: number;
   stock: number;
-  category?:
-    | {
-        id?: string;
-        name: string;
-      }
-    | string;
+  status?: string;
+  categoryId: string;
+  category?: { id?: string; name: string } | string;
 }
 
-// 2. Estructura consumida por la interfaz de usuario en React
 export interface Product {
   id: string;
   name: string;
   description?: string;
   category: string;
+  categoryId: string;
   price: number;
   stock: number;
-  status: "Activo" | "Bajo Stock" | "Sin Stock";
+  status: "Activo" | "Inactivo" | "Bajo Stock" | "Sin Stock";
   imageUrl: string;
 }
 
-// 3. Payload para crear/editar productos hacia el backend
 export interface CreateProductPayload {
+  sku: string;
   name: string;
   price: number;
   stock: number;
-  categoryId: string; // Requerido obligatoriamente por el backend
-  category?: string;
+  categoryId: string;
   description?: string;
-  imageUrl?: string;
 }
 
-// Estructura wrapper del backend (StandardResponse.java)
 interface StandardResponse<T> {
+  success: boolean;
+  message: string;
   data: T;
-  message?: string;
-  status?: number;
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
-const BASE_URL = `${API_BASE}/api/v1/products`;
+interface PageResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+}
 
-const getHeaders = (token?: string): HeadersInit => {
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-  };
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+const API_BASE = API_BASE_URL;
+const PRODUCTS_URL = `${API_BASE}/products`;
+const CATEGORIES_URL = `${API_BASE}/categories`;
+
+const getHeaders = (token?: string): HeadersInit => ({
+  "Content-Type": "application/json",
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+});
+
+const readResponse = async <T>(response: Response): Promise<T> => {
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Error HTTP (${response.status}): ${errorText}`);
   }
-  return headers;
+  const json = (await response.json()) as StandardResponse<T> | T;
+  return (json && typeof json === "object" && "data" in json
+    ? json.data
+    : json) as T;
 };
 
-// Mapeador: Transforma BackendProduct -> Product para React
-const mapToUIProduct = (item: BackendProduct): Product => {
-  // Extrae el nombre de la categoría ya sea objeto o string
-  const categoryName =
-    typeof item.category === "object" && item.category !== null
-      ? item.category.name
-      : (item.category as string) || "General";
-
-  // Determina el estado dinámicamente según el inventario
+const mapToUIProduct = (
+  item: BackendProduct,
+  categoryName?: string,
+): Product => {
   let status: Product["status"] = "Activo";
-  if (item.stock === 0) {
-    status = "Sin Stock";
-  } else if (item.stock < 5) {
-    status = "Bajo Stock";
-  }
+  if (item.status?.toUpperCase() === "INACTIVO") status = "Inactivo";
+  else if (item.stock === 0) status = "Sin Stock";
+  else if (item.stock < 5) status = "Bajo Stock";
 
   return {
     id: String(item.id),
     name: item.name,
     description: item.description,
-    category: categoryName,
-    price: item.price,
-    stock: item.stock,
+    category:
+      categoryName ||
+      (typeof item.category === "object" && item.category !== null
+        ? item.category.name
+        : item.category) ||
+      "General",
+    categoryId:
+      item.categoryId ||
+      (typeof item.category === "object" ? item.category.id : undefined) ||
+      "",
+    price: Number(item.price),
+    stock: Number(item.stock),
     status,
     imageUrl:
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&q=80",
@@ -88,82 +104,76 @@ const mapToUIProduct = (item: BackendProduct): Product => {
 };
 
 export const catalogService = {
-  // GET /api/v1/products
-  getProducts: async (token?: string): Promise<Product[]> => {
-    const res = await fetch(BASE_URL, {
+  getCategories: async (token?: string): Promise<Category[]> => {
+    const response = await fetch(CATEGORIES_URL, {
       headers: getHeaders(token),
     });
-    if (!res.ok) throw new Error("Error al obtener productos");
-
-    const json: StandardResponse<BackendProduct[]> | BackendProduct[] =
-      await res.json();
-    const rawList: BackendProduct[] = "data" in json ? json.data : json;
-
-    return rawList.map(mapToUIProduct);
+    const data = await readResponse<Category[] | PageResponse<Category>>(response);
+    return Array.isArray(data) ? data : data.content;
   },
 
-  // GET /api/v1/products/{id}
-  getProductById: async (
-    id: number | string,
+  getProducts: async (
     token?: string,
-  ): Promise<Product> => {
-    const res = await fetch(`${BASE_URL}/${id}`, {
+    categoryId?: string,
+    name?: string,
+  ): Promise<Product[]> => {
+    const query = new URLSearchParams({ page: "0", size: "20" });
+    if (categoryId) query.set("categoryId", categoryId);
+    if (name?.trim()) query.set("name", name.trim());
+
+    const response = await fetch(`${PRODUCTS_URL}/search?${query}`, {
       headers: getHeaders(token),
     });
-    if (!res.ok) throw new Error("Producto no encontrado");
-
-    const json: StandardResponse<BackendProduct> | BackendProduct =
-      await res.json();
-    const rawProduct: BackendProduct = "data" in json ? json.data : json;
-
-    return mapToUIProduct(rawProduct);
+    const data = await readResponse<BackendProduct[] | PageResponse<BackendProduct>>(
+      response,
+    );
+    const products = Array.isArray(data) ? data : data.content;
+    return products.map((item) => mapToUIProduct(item));
   },
 
-  // POST /api/v1/products
+  getProductById: async (id: number | string, token?: string): Promise<Product> => {
+    const response = await fetch(`${PRODUCTS_URL}/${id}`, {
+      headers: getHeaders(token),
+    });
+    const data = await readResponse<BackendProduct>(response);
+    return mapToUIProduct(data);
+  },
+
   createProduct: async (
     productData: CreateProductPayload,
     token?: string,
   ): Promise<Product> => {
-    const res = await fetch(BASE_URL, {
+    const response = await fetch(PRODUCTS_URL, {
       method: "POST",
       headers: getHeaders(token),
       body: JSON.stringify(productData),
     });
-    if (!res.ok) throw new Error("Error al crear producto");
-
-    const json: StandardResponse<BackendProduct> | BackendProduct =
-      await res.json();
-    const rawProduct: BackendProduct = "data" in json ? json.data : json;
-
-    return mapToUIProduct(rawProduct);
+    const data = await readResponse<BackendProduct>(response);
+    return mapToUIProduct(data);
   },
 
-  // PUT /api/v1/products/{id}
   updateProduct: async (
     id: number | string,
     productData: Partial<CreateProductPayload>,
     token?: string,
   ): Promise<Product> => {
-    const res = await fetch(`${BASE_URL}/${id}`, {
+    const response = await fetch(`${PRODUCTS_URL}/${id}`, {
       method: "PUT",
       headers: getHeaders(token),
       body: JSON.stringify(productData),
     });
-    if (!res.ok) throw new Error("Error al actualizar producto");
-
-    const json: StandardResponse<BackendProduct> | BackendProduct =
-      await res.json();
-    const rawProduct: BackendProduct = "data" in json ? json.data : json;
-
-    return mapToUIProduct(rawProduct);
+    const data = await readResponse<BackendProduct>(response);
+    return mapToUIProduct(data);
   },
 
-  // DELETE /api/v1/products/{id}
   deleteProduct: async (id: number | string, token?: string): Promise<void> => {
-    const res = await fetch(`${BASE_URL}/${id}`, {
+    const response = await fetch(`${PRODUCTS_URL}/${id}`, {
       method: "DELETE",
       headers: getHeaders(token),
     });
-    if (!res.ok) throw new Error("Error al eliminar producto");
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error HTTP (${response.status}): ${errorText}`);
+    }
   },
 };

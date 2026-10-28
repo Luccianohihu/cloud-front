@@ -1,12 +1,12 @@
 // src/shared/ui/layout/Sidebar.tsx
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShoppingBag, Boxes, LogOut } from "lucide-react";
-import { useAuth } from "../../../../context/AuthContext";
+import { LayoutDashboard, ShoppingBag, Boxes } from "lucide-react";
+import { useAuth } from "../../../../context/useAuth";
 import styles from "./Sidebar.module.css";
 
 export const Sidebar: React.FC = () => {
-  const { user, role, logout } = useAuth();
+  const { user, role } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -15,11 +15,6 @@ export const Sidebar: React.FC = () => {
     { label: "Pedidos", path: "/orders", icon: ShoppingBag },
     { label: "Catálogo", path: "/catalogo", icon: Boxes },
   ];
-
-  const handleLogout = () => {
-    logout();
-    navigate("/", { replace: true });
-  };
 
   return (
     <aside className={styles.sidebar}>
@@ -66,14 +61,6 @@ export const Sidebar: React.FC = () => {
           </div>
         </div>
 
-        <button
-          className={styles.logoutButton}
-          onClick={handleLogout}
-          title="Cerrar sesión"
-        >
-          <LogOut size={18} />
-          Cerrar Sesión
-        </button>
       </div>
     </aside>
   );

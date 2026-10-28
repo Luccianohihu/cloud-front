@@ -4,22 +4,19 @@ import {
   type ClienteMetrics,
   type GeneralSummary,
 } from "./DashboardService";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 import styles from "./DashboardPage.module.css";
 
 interface DashboardPageProps {
-  userId?: string;
   accessToken?: string;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
-  userId: propUserId,
   accessToken: propToken,
 }) => {
-  const { token: contextToken, role: contextRole, user } = useAuth();
+  const { token: contextToken, role: contextRole } = useAuth();
 
   const token = propToken || contextToken || undefined;
-  const userId = propUserId || user?.username || user?.id || "";
   const userRole = contextRole || "ROLE_CLIENTE";
 
   const roleUpper = userRole.toUpperCase();
@@ -38,7 +35,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       setLoading(true);
       try {
         if (isCliente) {
-          const data = await dashboardService.getClienteMetrics(userId, token);
+          const data = await dashboardService.getClienteMetrics(token);
           setClienteData(data);
         } else {
           // Tanto Operador como Admin entran aquí
@@ -53,7 +50,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     };
 
     loadDashboard();
-  }, [token, userId, isCliente]);
+  }, [token, isCliente]);
 
   if (loading) {
     return (
@@ -136,7 +133,7 @@ const GeneralDashboard: React.FC<{ data: GeneralSummary }> = ({ data }) => (
       <div>
         <h1 className={styles.title}>Resumen Operativo del Sistema</h1>
         <p className={styles.subtitle}>
-          Monitoreo general de pedidos y alertas de stock bajo.
+          Resumen de ventas y estados de órdenes.
         </p>
       </div>
     </header>
@@ -148,17 +145,22 @@ const GeneralDashboard: React.FC<{ data: GeneralSummary }> = ({ data }) => (
       </div>
       <div className={styles.metricCard}>
         <span className={styles.metricTitle}>En Proceso / Pendientes</span>
-        <span className={styles.metricValue}>{data.pendingOrders}</span>
+        <span className={styles.metricValue}>
+          {(data.statusCounts.CREADO || 0) +
+            (data.statusCounts.ACEPTADO || 0) +
+            (data.statusCounts.EN_PREPARACION || 0) +
+            (data.statusCounts.DESPACHADO || 0)}
+        </span>
       </div>
       <div className={styles.metricCard}>
         <span className={styles.metricTitle}>Entregados</span>
-        <span className={styles.metricValue}>{data.deliveredOrders}</span>
+        <span className={styles.metricValue}>
+          {data.statusCounts.ENTREGADO || 0}
+        </span>
       </div>
       <div className={styles.metricCard}>
-        <span className={styles.metricTitle}>Alertas Stock (&lt; 5)</span>
-        <span className={styles.metricValue}>
-          {data.lowStockProducts.length}
-        </span>
+        <span className={styles.metricTitle}>Pendientes de aceptación</span>
+        <span className={styles.metricValue}>{data.pendingAcceptance}</span>
       </div>
     </div>
 
@@ -191,36 +193,6 @@ const GeneralDashboard: React.FC<{ data: GeneralSummary }> = ({ data }) => (
             ) : (
               <tr>
                 <td colSpan={5}>No hay pedidos registrados.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
-
-      <section className={styles.sectionCard}>
-        <h3>Productos con Bajo Stock (&lt; 5 unid.)</h3>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Precio</th>
-              <th>Stock Restante</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.lowStockProducts.length > 0 ? (
-              data.lowStockProducts.map((product) => (
-                <tr key={product.id}>
-                  <td>{product.name}</td>
-                  <td>€{product.price.toFixed(2)}</td>
-                  <td style={{ color: "#d97706", fontWeight: "bold" }}>
-                    {product.stock}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={3}>No hay productos con bajo stock.</td>
               </tr>
             )}
           </tbody>
