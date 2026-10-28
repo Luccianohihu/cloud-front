@@ -9,14 +9,7 @@ import {
 import { Hub } from "aws-amplify/utils";
 import "aws-amplify/auth/enable-oauth-listener";
 import { AuthContext, type User } from "./auth-context";
-
-type AuthProviderName = "keycloak" | "cognito";
-
-const authProvider = (
-  import.meta.env.VITE_AUTH_PROVIDER?.toLowerCase() === "cognito"
-    ? "cognito"
-    : "keycloak"
-) as AuthProviderName;
+import { authProvider } from "../config/auth";
 
 const keycloak = new Keycloak({
   url: import.meta.env.VITE_KEYCLOAK_URL || "http://localhost:8080",

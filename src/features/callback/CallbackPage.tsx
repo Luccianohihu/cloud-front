@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
+import { authProviderLabel } from "../../config/auth";
 
 export const CallbackPage: React.FC = () => {
   const { token, role, isLoading } = useAuth();
@@ -24,7 +25,7 @@ export const CallbackPage: React.FC = () => {
   return (
     <div style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
       <p>
-        Autenticando con {import.meta.env.VITE_AUTH_PROVIDER?.toLowerCase() === "cognito" ? "Amazon Cognito" : "Keycloak"}...
+        Autenticando con {authProviderLabel}...
       </p>
     </div>
   );
