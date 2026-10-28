@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "../../config/api";
+
 export type OrderStatus =
   | "CREADO"
   | "ACEPTADO"
@@ -36,7 +38,7 @@ export interface CreateOrderPayload {
   items: OrderItem[];
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8083/api/v1";
+const API_BASE = API_BASE_URL;
 const BASE_URL = `${API_BASE}/orders`;
 
 const getHeaders = (token?: string) => ({
@@ -120,11 +122,14 @@ export const orderService = {
       content: Array.isArray(data?.content)
         ? data.content.map(mapToFrontendOrder)
         : [],
-      page: Number(data?.page ?? page),
-      size: Number(data?.size ?? size),
-      totalElements: Number(data?.totalElements ?? 0),
-      totalPages: Number(data?.totalPages ?? 0),
-      last: Boolean(data?.last),
+      // The BFF wraps Spring page metadata as { content, page: { number, ... } }.
+      page: Number(data?.page?.number ?? data?.page ?? page),
+      size: Number(data?.page?.size ?? data?.size ?? size),
+      totalElements: Number(data?.page?.totalElements ?? data?.totalElements ?? 0),
+      totalPages: Number(data?.page?.totalPages ?? data?.totalPages ?? 0),
+      last: Boolean(data?.page?.number != null
+        ? Number(data.page.number) + 1 >= Number(data.page.totalPages)
+        : data?.last),
     };
   },
 
@@ -158,7 +163,6 @@ export const orderService = {
       items: payload.items.map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
-        unitPrice: item.unitPrice ?? item.price ?? 0,
       })),
     };
     const response = await fetch(BASE_URL, {

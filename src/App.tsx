@@ -21,7 +21,7 @@ export default function App() {
       <Route path="/catalogo" element={<CatalogPage />} />
       <Route path="/login" element={<LoginPage />} />
 
-      {/* Retorno de autenticación de Keycloak */}
+      {/* Callback OAuth de Keycloak o Cognito */}
       <Route path="/callback" element={<CallbackPage />} />
 
       {/* Rutas protegidas */}

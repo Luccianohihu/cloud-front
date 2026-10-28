@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "../../config/api";
+
 export interface Category {
   id: string;
   name: string;
@@ -50,7 +52,7 @@ interface PageResponse<T> {
   last: boolean;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8083/api/v1";
+const API_BASE = API_BASE_URL;
 const PRODUCTS_URL = `${API_BASE}/products`;
 const CATEGORIES_URL = `${API_BASE}/categories`;
 

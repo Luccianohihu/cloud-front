@@ -6,6 +6,9 @@ import styles from "./LoginPage.module.css";
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth(); // Hook de autenticación
+  const authProvider = import.meta.env.VITE_AUTH_PROVIDER?.toLowerCase() === "cognito"
+    ? "Amazon Cognito"
+    : "Keycloak";
 
   return (
     <div className={styles.loginPage}>
@@ -20,7 +23,7 @@ export const LoginPage: React.FC = () => {
         <div className={styles.loginCard}>
           <h2>Iniciar Sesión</h2>
           <p className={styles.loginSubtitle}>
-            Inicia sesión con Keycloak para continuar
+            Inicia sesión con {authProvider} para continuar
           </p>
 
           <CustomButton
@@ -33,7 +36,7 @@ export const LoginPage: React.FC = () => {
           </CustomButton>
 
           <div className={styles.securityNotice}>
-            <span>Acceso protegido por Keycloak.</span>
+            <span>Acceso protegido por {authProvider}.</span>
           </div>
         </div>
       </section>

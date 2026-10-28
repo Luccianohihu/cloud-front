@@ -1,7 +1,8 @@
 
 import { useAuth } from "../context/useAuth";
+import { API_BASE_URL } from "../config/api";
 
-const BFF_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8083/api/v1";
+const BFF_BASE_URL = API_BASE_URL;
 
 export const useApi = () => {
 const { token: accessToken } = useAuth();

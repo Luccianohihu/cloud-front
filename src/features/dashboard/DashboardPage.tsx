@@ -159,10 +159,8 @@ const GeneralDashboard: React.FC<{ data: GeneralSummary }> = ({ data }) => (
         </span>
       </div>
       <div className={styles.metricCard}>
-        <span className={styles.metricTitle}>Ingresos Totales</span>
-        <span className={styles.metricValue}>
-          {data.totalRevenue.toLocaleString("es-CL")}
-        </span>
+        <span className={styles.metricTitle}>Pendientes de aceptación</span>
+        <span className={styles.metricValue}>{data.pendingAcceptance}</span>
       </div>
     </div>
 

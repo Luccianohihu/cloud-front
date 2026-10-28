@@ -23,7 +23,9 @@ export const CallbackPage: React.FC = () => {
 
   return (
     <div style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
-      <p>Autenticando con Keycloak...</p>
+      <p>
+        Autenticando con {import.meta.env.VITE_AUTH_PROVIDER?.toLowerCase() === "cognito" ? "Amazon Cognito" : "Keycloak"}...
+      </p>
     </div>
   );
 };

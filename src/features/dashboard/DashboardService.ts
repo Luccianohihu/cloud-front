@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "../../config/api";
+
 export interface Product {
   id: string;
   name: string;
@@ -23,14 +25,14 @@ export interface ClienteMetrics {
 
 export interface GeneralSummary {
   totalOrders: number;
-  totalRevenue: number;
   statusCounts: Record<string, number>;
+  pendingAcceptance: number;
   recentOrders: Order[];
 }
 
 export type OrderSummaryMetrics = Omit<GeneralSummary, "recentOrders">;
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8083/api/v1";
+const API_BASE = API_BASE_URL;
 const ORDERS_URL = `${API_BASE}/orders`;
 
 const getHeaders = (token?: string) => ({
@@ -75,15 +77,15 @@ const fetchOrderSummaryMetrics = async (
   });
   const summary = await readData(response);
   const statusCounts = Object.fromEntries(
-    Object.entries(summary.statusCounts || {}).map(([status, count]) => [
+    Object.entries(summary.orderByStatus || summary.statusCounts || {}).map(([status, count]) => [
       status,
       Number(count),
     ]),
   );
   return {
     totalOrders: Number(summary.totalOrders || 0),
-    totalRevenue: Number(summary.totalRevenue || 0),
     statusCounts,
+    pendingAcceptance: Number(summary.pendingAcceptance ?? statusCounts.CREADO ?? 0),
   };
 };
 
