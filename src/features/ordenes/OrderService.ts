@@ -8,6 +8,28 @@ export type OrderStatus =
   | "ENTREGADO"
   | "CANCELADO";
 
+const ORDER_STATUSES: ReadonlySet<string> = new Set([
+  "CREADO",
+  "ACEPTADO",
+  "EN_PREPARACION",
+  "DESPACHADO",
+  "ENTREGADO",
+  "CANCELADO",
+]);
+
+const normalizeOrderStatus = (status: unknown): OrderStatus => {
+  const normalized = String(status ?? "CREADO")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+  return ORDER_STATUSES.has(normalized)
+    ? (normalized as OrderStatus)
+    : "CREADO";
+};
+
 export interface OrderItem {
   productId: string;
   quantity: number;
@@ -74,7 +96,7 @@ const mapToFrontendOrder = (rawOrder: any): Order => ({
         minute: "2-digit",
       })
     : new Date().toLocaleDateString("es-ES"),
-  status: (rawOrder.status || rawOrder.orderState || "CREADO") as OrderStatus,
+  status: normalizeOrderStatus(rawOrder.status || rawOrder.orderState),
   total: Number(rawOrder.total || 0),
   customerId: String(rawOrder.clientId || rawOrder.customerId || "N/A"),
   items: (rawOrder.items || []).map((item: any) => ({
