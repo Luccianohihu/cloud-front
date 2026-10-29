@@ -18,6 +18,21 @@ const formatCurrency = (amount: number) =>
 const formatClientId = (clientId: string) =>
   clientId && clientId !== "N/A" ? `${clientId.slice(0, 8)}…` : "—";
 
+const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  CREADO: "CREADO",
+  ACEPTADO: "ACEPTADO",
+  EN_PREPARACION: "EN PREPARACIÓN",
+  DESPACHADO: "DESPACHADO",
+  ENTREGADO: "ENTREGADO",
+  CANCELADO: "CANCELADO",
+};
+
+const NEXT_ORDER_STATUSES: Partial<Record<OrderStatus, OrderStatus[]>> = {
+  ACEPTADO: ["EN_PREPARACION"],
+  EN_PREPARACION: ["DESPACHADO"],
+  DESPACHADO: ["ENTREGADO"],
+};
+
 export type UserRole =
   | "ROLE_CLIENTE"
   | "ROLE_OPERADOR"
@@ -173,13 +188,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
     currentStatus: OrderStatus,
     newStatus: OrderStatus,
   ) => {
-    if (newStatus === "ACEPTADO" || newStatus === "CANCELADO") return;
-    if (newStatus === "DESPACHADO" && currentStatus === "CREADO") {
-      alert(
-        "Regla de Negocio: Un pedido debe estar en estado ACEPTADO o EN_PREPARACION antes de ser DESPACHADO.",
-      );
-      return;
-    }
+    if (!NEXT_ORDER_STATUSES[currentStatus]?.includes(newStatus)) return;
 
     try {
       const updatedOrder = await orderService.updateOrderStatus(
@@ -345,7 +354,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                     <td>{formatClientId(order.customerId)}</td>
                     <td>
                       <span className={getStatusBadge(order.status)}>
-                        {order.status.replace("_", " ")}
+                        {ORDER_STATUS_LABELS[order.status]}
                       </span>
                     </td>
                     <td className={styles.boldText}>
@@ -356,7 +365,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                       {isCliente ? (
                         <div style={{ textAlign: "right" }}>
                           <span className={getStatusBadge(order.status)}>
-                            {order.status.replace("_", " ")}
+                            {ORDER_STATUS_LABELS[order.status]}
                           </span>
                         </div>
                       ) : (
@@ -375,7 +384,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                               Aceptar
                             </button>
                           )}
-                          {order.status !== "CREADO" && order.status !== "CANCELADO" && (
+                          {(NEXT_ORDER_STATUSES[order.status]?.length ?? 0) > 0 && (
                             <select
                               className={styles.statusSelect}
                               value={order.status}
@@ -387,10 +396,14 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                                 )
                               }
                             >
-                              <option value={order.status}>{order.status}</option>
-                              <option value="EN_PREPARACION">EN PREPARACION</option>
-                              <option value="DESPACHADO">DESPACHADO</option>
-                              <option value="ENTREGADO">ENTREGADO</option>
+                              <option value={order.status} disabled>
+                                {ORDER_STATUS_LABELS[order.status]}
+                              </option>
+                              {NEXT_ORDER_STATUSES[order.status]?.map((status) => (
+                                <option key={status} value={status}>
+                                  {ORDER_STATUS_LABELS[status]}
+                                </option>
+                              ))}
                             </select>
                           )}
 
